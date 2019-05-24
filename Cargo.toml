@@ -1,0 +1,11 @@
+[package]
+name = "phase2-scout"
+version = "0.0.0"
+authors = ["Alex Beregszaszi <alex@rtfs.hu>"]
+license = "Apache-2.0"
+repository = "https://github.com/ewasm/scout"
+description = "Eth 2.0 Phase 2 execution prototyping engine"
+publish = false
+edition = "2018"
+
+[dependencies]
