@@ -9,3 +9,5 @@ publish = false
 edition = "2018"
 
 [dependencies]
+wasmi = "0.4.2"
+rustc-hex = "1.0"
