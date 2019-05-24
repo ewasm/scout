@@ -14,28 +14,64 @@ use wasmi::{
 mod types;
 use crate::types::*;
 
-const USEGAS_FUNC_INDEX: usize = 0;
+const LOADPRESTATE_FUNC_INDEX: usize = 0;
+const BLOCKDATASIZE_FUNC_INDEX: usize = 1;
+const BLOCKDATACOPY_FUNC_INDEX: usize = 2;
+const SAVEPOSTSTATE_FUNC_INDEX: usize = 3;
+const PUSHNEWDEPOSIT_FUNC_INDEX: usize = 4;
 
-struct Runtime {
-    memory: Option<MemoryRef>,
+struct Runtime<'a> {
+    pub memory: Option<MemoryRef>,
+    pre_state: &'a Bytes32,
+    block_data: &'a ShardBlockBody,
+    post_state: Bytes32,
 }
 
-impl Runtime {
-    fn new() -> Runtime {
+impl<'a> Runtime<'a> {
+    fn new(pre_state: &'a Bytes32, block_data: &'a ShardBlockBody) -> Runtime<'a> {
         Runtime {
             memory: Some(MemoryInstance::alloc(Pages(1), Some(Pages(1))).unwrap()),
+            pre_state: pre_state,
+            block_data: block_data,
+            post_state: Bytes32::default(),
         }
+    }
+
+    fn get_post_state(&self) -> Bytes32 {
+        self.post_state
     }
 }
 
-impl<'a> Externals for Runtime {
+impl<'a> Externals for Runtime<'a> {
     fn invoke_index(
         &mut self,
         index: usize,
         args: RuntimeArgs,
     ) -> Result<Option<RuntimeValue>, Trap> {
         match index {
-            USEGAS_FUNC_INDEX => Ok(None),
+            LOADPRESTATE_FUNC_INDEX => {
+                let ptr: u32 = args.nth(0);
+                println!("loadprestate to {}", ptr);
+
+                let memory = self.memory.as_ref().expect("expects memory");
+                memory.set(ptr, &self.pre_state.bytes).unwrap();
+
+                Ok(None)
+            }
+            SAVEPOSTSTATE_FUNC_INDEX => {
+                let ptr: u32 = args.nth(0);
+
+                let memory = self.memory.as_ref().expect("expects memory");
+                memory.get_into(ptr, &mut self.post_state.bytes).unwrap();
+
+                Ok(None)
+            }
+            BLOCKDATASIZE_FUNC_INDEX => {
+                let ret: i32 = self.block_data.data.len() as i32;
+                Ok(Some(ret.into()))
+            }
+            BLOCKDATACOPY_FUNC_INDEX => unimplemented!(),
+            PUSHNEWDEPOSIT_FUNC_INDEX => unimplemented!(),
             _ => panic!("unknown function index"),
         }
     }
@@ -50,9 +86,25 @@ impl<'a> ModuleImportResolver for RuntimeModuleImportResolver {
         _signature: &Signature,
     ) -> Result<FuncRef, InterpreterError> {
         let func_ref = match field_name {
-            "useGas" => FuncInstance::alloc_host(
-                Signature::new(&[ValueType::I64][..], None),
-                USEGAS_FUNC_INDEX,
+            "eth2_loadPreState" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32][..], None),
+                LOADPRESTATE_FUNC_INDEX,
+            ),
+            "eth2_blockDataSize" => FuncInstance::alloc_host(
+                Signature::new(&[][..], Some(ValueType::I32)),
+                BLOCKDATASIZE_FUNC_INDEX,
+            ),
+            "eth2_blockDataCopy" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32, ValueType::I32, ValueType::I32][..], None),
+                BLOCKDATACOPY_FUNC_INDEX,
+            ),
+            "eth2_savePostState" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32][..], None),
+                SAVEPOSTSTATE_FUNC_INDEX,
+            ),
+            "eth2_pushNewDeposit" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32][..], None),
+                PUSHNEWDEPOSIT_FUNC_INDEX,
             ),
             _ => {
                 return Err(InterpreterError::Function(format!(
@@ -137,13 +189,23 @@ pub fn execute_code(
 
     let module = wasm_load_from_blob(&code);
     let mut imports = ImportsBuilder::new();
-    imports.push_resolver("ethereum", &RuntimeModuleImportResolver);
+    // FIXME: use eth2
+    imports.push_resolver("env", &RuntimeModuleImportResolver);
 
     let instance = ModuleInstance::new(&module, &imports)
         .unwrap()
         .assert_no_start();
 
-    let mut runtime = Runtime::new();
+    let mut runtime = Runtime::new(pre_state, block_data);
+
+    let internal_mem = instance
+        .export_by_name("memory")
+        .expect("Module expected to have 'memory' export")
+        .as_memory()
+        .cloned()
+        .expect("'memory' export should be a memory");
+
+    runtime.memory = Some(internal_mem);
 
     let result = instance
         .invoke_export("main", &[], &mut runtime)
@@ -152,7 +214,7 @@ pub fn execute_code(
     println!("Result: {:?}", result);
     println!("Execution finished");
 
-    (Bytes32::default(), vec![Deposit {}])
+    (runtime.get_post_state(), vec![Deposit {}])
 }
 
 pub fn process_shard_block(
@@ -160,7 +222,7 @@ pub fn process_shard_block(
     beacon_state: BeaconState,
     block: Option<ShardBlock>,
 ) {
-    println!("Beacon state: {:#?}", beacon_state);
+    // println!("Beacon state: {:#?}", beacon_state);
     println!("Executing block: {:#?}", block);
 
     println!("Pre-execution: {:#?}", state);
@@ -186,20 +248,16 @@ pub fn process_shard_block(
     println!("Post-execution: {:#?}", state)
 }
 
-fn main() {
-    let execution_script = FromHex::from_hex(
-        "
-            0061736d010000000113046000017f60037f7f7f0060027f7f00600000023e0308
-            657468657265756d0b676574436f646553697a65000008657468657265756d0863
-            6f6465436f7079000108657468657265756d0666696e6973680002030201030503
-            010001071102066d656d6f72790200046d61696e00030a2c012a01037f10002100
-            4100410020001001200041046b2802002102200041046b20026b21012001200210
-            020b
+fn load_file(filename: &str) -> Vec<u8> {
+    use std::io::prelude::*;
+    let mut file = File::open(filename).unwrap();
+    let mut buf = Vec::new();
+    file.read_to_end(&mut buf).unwrap();
+    buf
+}
 
-            000d086465706c6f79657200000000
-        ",
-    )
-    .unwrap();
+fn main() {
+    let execution_script = load_file("phase2_helloworld.wasm");
 
     let mut shard_state = ShardState {
         exec_env_states: vec![Bytes32::default()],
