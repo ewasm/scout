@@ -11,6 +11,9 @@ use wasmi::{
     RuntimeValue, Signature, Trap, ValueType,
 };
 
+mod types;
+use crate::types::*;
+
 const USEGAS_FUNC_INDEX: usize = 0;
 
 struct Runtime {
@@ -75,13 +78,10 @@ fn wasm_load_from_blob(buf: &[u8]) -> Module {
 }
 
 const BYTES_PER_SHARD_BLOCK_BODY: usize = 16384;
-const ZERO_HASH: Bytes32 = Bytes32 {};
+const ZERO_HASH: Bytes32 = Bytes32 { bytes: [0u8; 32] };
 
 /// These are Phase 0 structures.
 /// https://github.com/ethereum/eth2.0-specs/blob/dev/specs/core/0_beacon-chain.md
-#[derive(Default, Clone, Debug)]
-pub struct Bytes32 {}
-
 #[derive(Default, Clone, Debug)]
 pub struct Deposit {}
 
@@ -152,7 +152,7 @@ pub fn execute_code(
     println!("Result: {:?}", result);
     println!("Execution finished");
 
-    (Bytes32 {}, vec![Deposit {}])
+    (Bytes32::default(), vec![Deposit {}])
 }
 
 pub fn process_shard_block(
@@ -202,7 +202,7 @@ fn main() {
     .unwrap();
 
     let mut shard_state = ShardState {
-        exec_env_states: vec![Bytes32 {}],
+        exec_env_states: vec![Bytes32::default()],
         slot: 0,
         parent_block: ShardBlockHeader {},
     };
