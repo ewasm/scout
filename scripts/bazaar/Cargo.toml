@@ -1,0 +1,18 @@
+[package]
+name = "phase2-bazaar"
+version = "0.0.0"
+authors = ["Alex Beregszaszi <alex@rtfs.hu>"]
+license = "Apache-2.0"
+repository = "https://github.com/ewasm/scout"
+description = "Eth 2.0 Phase 2 execution script: Bazaar message board"
+publish = false
+edition = "2018"
+
+[dependencies]
+ewasm_api = { git = "https://github.com/ewasm/ewasm-rust-api", branch = "eth2-phase2" }
+ssz = "0.1.2"
+ssz-derive = "0.1.2"
+sha3 = "^0.6"
+
+[lib]
+crate-type = ["cdylib"]
