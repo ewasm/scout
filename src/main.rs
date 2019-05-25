@@ -33,12 +33,16 @@ const DEBUG_PRINTMEMHEX_FUNC: usize = 9;
 const BIGNUM_ADD256_FUNC: usize = 10;
 const BIGNUM_SUB256_FUNC: usize = 11;
 
+// TODO: move elsehwere?
+type DepositBlob = Vec<u8>;
+
 struct Runtime<'a> {
     ticks_left: u32,
     memory: Option<MemoryRef>,
     pre_state: &'a Bytes32,
     block_data: &'a ShardBlockBody,
     post_state: Bytes32,
+    deposits: Vec<DepositBlob>,
 }
 
 impl<'a> Runtime<'a> {
@@ -58,11 +62,17 @@ impl<'a> Runtime<'a> {
             pre_state: pre_state,
             block_data: block_data,
             post_state: Bytes32::default(),
+            deposits: vec![],
         }
     }
 
     fn get_post_state(&self) -> Bytes32 {
         self.post_state
+    }
+
+    fn get_deposits(&self) -> Vec<DepositBlob> {
+        // TODO: avoid cloning here
+        self.deposits.clone()
     }
 }
 
@@ -132,7 +142,20 @@ impl<'a> Externals for Runtime<'a> {
 
                 Ok(None)
             }
-            PUSHNEWDEPOSIT_FUNC_INDEX => unimplemented!(),
+            PUSHNEWDEPOSIT_FUNC_INDEX => {
+                let ptr: u32 = args.nth(0);
+                let length: u32 = args.nth(1);
+                info!("pushnewdeposit from {} for {} bytes", ptr, length);
+
+                let memory = self.memory.as_ref().expect("expects memory");
+                let tmp = memory
+                    .get(ptr, length as usize)
+                    .expect("expects reading from memory to succeed");
+                debug!("deposit: {}", tmp.to_hex());
+                self.deposits.push(tmp);
+
+                Ok(None)
+            }
             DEBUG_PRINT32_FUNC => {
                 let value: u32 = args.nth(0);
                 debug!("print.i32: {}", value);
@@ -491,7 +514,7 @@ pub fn execute_code(
     code: &[u8],
     pre_state: &Bytes32,
     block_data: &ShardBlockBody,
-) -> Result<(Bytes32, Vec<Deposit>), Box<dyn Error>> {
+) -> Result<(Bytes32, Vec<DepositBlob>), Box<dyn Error>> {
     debug!(
         "Executing codesize({}) and data: {}",
         code.len(),
@@ -523,7 +546,7 @@ pub fn execute_code(
     info!("Result: {:?}", result);
     info!("Execution finished");
 
-    Ok((runtime.get_post_state(), vec![Deposit {}]))
+    Ok((runtime.get_post_state(), runtime.get_deposits()))
 }
 
 pub fn process_shard_block(
@@ -550,7 +573,9 @@ pub fn process_shard_block(
         // }
         let pre_state = &state.exec_env_states[env];
         let (post_state, deposits) = execute_code(code, pre_state, &block.data)?;
-        state.exec_env_states[env] = post_state
+        state.exec_env_states[env] = post_state;
+
+        info!("Post-execution deposits: {:?}", deposits)
     }
 
     // TODO: implement state + deposit root handling
