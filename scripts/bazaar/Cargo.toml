@@ -13,6 +13,7 @@ ewasm_api = { version = "0.11", features = ["std", "eth2", "qimalloc"] }
 ssz = "0.1.2"
 ssz-derive = "0.1.2"
 sha3 = "^0.6"
+sha2 = "0.8"
 
 [lib]
 crate-type = ["cdylib"]

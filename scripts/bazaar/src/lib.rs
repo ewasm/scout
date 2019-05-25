@@ -33,7 +33,7 @@ extern crate ssz_derive;
 
 use ewasm_api::*;
 use sha3::{Digest, Keccak256};
-use ssz::{Decode, Encode};
+use ssz::{Decode, Encode, Hashable};
 
 #[derive(Debug, PartialEq, Ssz, Default)]
 struct Message {
@@ -50,6 +50,26 @@ struct State {
 struct InputBlock {
     pub new_messages: Vec<Message>,
     pub state: State,
+}
+
+    use sha2::{Sha256};
+//    use core::hash::Hasher;
+    use ssz::hash_db::Hasher;
+    use plain_hasher::PlainHasher;
+
+pub struct Sha256Hasher;
+impl Hasher for Sha256Hasher {
+	type Out = types::Bytes32;
+	type StdHasher = PlainHasher;
+	const LENGTH: usize = 32;
+
+	fn hash(x: &[u8]) -> Self::Out {
+	    let mut out = [0; 32];
+	    let mut ret = types::Bytes32::default();
+	    (&mut out).copy_from_slice(Sha256::digest(x).as_slice());
+	    ret.bytes.copy_from_slice(&out[..]);
+	    ret
+	}
 }
 
 trait StateRoot {
@@ -78,6 +98,7 @@ fn process_block(pre_state_root: types::Bytes32, mut block_data: &[u8]) -> types
 
     #[cfg(test)]
     println!("{:#?}", block.state);
+    println!("{:#?}", block.state.hash::<Sha256Hasher>());
 
     block.state.state_root()
 }
