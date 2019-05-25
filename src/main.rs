@@ -53,6 +53,7 @@ impl<'a> Externals for Runtime<'a> {
                 let ptr: u32 = args.nth(0);
                 println!("loadprestate to {}", ptr);
 
+                // TODO: add checks for out of bounds access
                 let memory = self.memory.as_ref().expect("expects memory");
                 memory.set(ptr, &self.pre_state.bytes).unwrap();
 
@@ -60,7 +61,9 @@ impl<'a> Externals for Runtime<'a> {
             }
             SAVEPOSTSTATE_FUNC_INDEX => {
                 let ptr: u32 = args.nth(0);
+                println!("savepoststate from {}", ptr);
 
+                // TODO: add checks for out of bounds access
                 let memory = self.memory.as_ref().expect("expects memory");
                 memory.get_into(ptr, &mut self.post_state.bytes).unwrap();
 
@@ -68,9 +71,30 @@ impl<'a> Externals for Runtime<'a> {
             }
             BLOCKDATASIZE_FUNC_INDEX => {
                 let ret: i32 = self.block_data.data.len() as i32;
+                println!("blockdatasize {}", ret);
                 Ok(Some(ret.into()))
             }
-            BLOCKDATACOPY_FUNC_INDEX => unimplemented!(),
+            BLOCKDATACOPY_FUNC_INDEX => {
+                let ptr: u32 = args.nth(0);
+                let offset: u32 = args.nth(1);
+                let length: u32 = args.nth(2);
+                println!(
+                    "blockdatacopy to {} from {} for {} bytes",
+                    ptr, offset, length
+                );
+
+                // TODO: add overflow check
+                let offset = offset as usize;
+                let length = length as usize;
+
+                // TODO: add checks for out of bounds access
+                let memory = self.memory.as_ref().expect("expects memory");
+                memory
+                    .set(ptr, &self.block_data.data[offset..length])
+                    .unwrap();
+
+                Ok(None)
+            }
             PUSHNEWDEPOSIT_FUNC_INDEX => unimplemented!(),
             _ => panic!("unknown function index"),
         }
