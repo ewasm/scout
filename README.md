@@ -31,7 +31,25 @@ Build the runner second:
 cargo build
 ```
 
-The runner expects a `phase2_helloworld.wasm` file to be in the same directory. It will print pre and post states. The pre state is pretty much empty, but has two copies of the execution script.
+The runner expects a YAML test file:
+```yaml
+beacon_state:
+  execution_scripts:
+    - scripts/helloworld/target/wasm32-unknown-unknown/release/phase2_helloworld.wasm
+shard_pre_state:
+  exec_env_states:
+    - "0000000000000000000000000000000000000000000000000000000000000000"
+shard_blocks:
+  - env: 0
+    data: ""
+  - env: 0
+    data: ""
+shard_post_state:
+  exec_env_states:
+    - "0000000000000000000000000000000000000000000000000000000000000000"
+```
+
+The runner expects a filename pointing to the test file or will default to `test.yaml` in the local directory if nothing was specified.
 
 ## How to code scripts?
 
