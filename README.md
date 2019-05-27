@@ -18,18 +18,17 @@ Instead of being a client, it should support reading and outputting shard/beacon
 
 ## How to use this?
 
-Need Rust first. The build system isn't too well integrated at the moment.
-
-Build the example script first:
+Need Rust first. Then install `chisel` using cargo:
 ```sh
-$ cd scripts/helloworld
-$ cargo build --release
+cargo install chisel
 ```
 
-Build the runner second:
-```sh
-cargo build
-```
+There is a `Makefile` to make building easy:
+- `build` will build all components (the runner and the example scripts)
+- `test` will run tests using the YAML test files
+- `all` will do both
+
+The runner is called scout and is available at `target/release/phase2-scout` after being built.
 
 The runner expects a YAML test file:
 ```yaml
@@ -73,6 +72,8 @@ pub extern "C" fn main() {
     eth2::save_post_state(post_state)
 }
 ```
+
+A better example is located in `scripts/bazaar` which is in essence a stateless contract. It uses SSZ serialisation. A test case is included in `bazaar.yaml`.
 
 It should be possible to import any Rust crate as long as it can be compiled to the wasm32 target.
 
