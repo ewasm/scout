@@ -2,7 +2,8 @@ extern crate rustc_hex;
 extern crate wasmi;
 
 use rustc_hex::FromHex;
-use std::env::args;
+use serde::{Deserialize, Serialize};
+use std::env;
 use std::fs::File;
 use wasmi::memory_units::Pages;
 use wasmi::{
@@ -259,9 +260,9 @@ pub fn process_shard_block(
         let code = &beacon_state.execution_scripts[env].code;
 
         // Set post states to empty for any holes
-        for x in 0..env {
-            state.exec_env_states.push(ZERO_HASH)
-        }
+        // for x in 0..env {
+        //     state.exec_env_states.push(ZERO_HASH)
+        // }
         let pre_state = &state.exec_env_states[env];
         let (post_state, deposits) = execute_code(code, pre_state, &block.data);
         state.exec_env_states[env] = post_state
@@ -280,7 +281,102 @@ fn load_file(filename: &str) -> Vec<u8> {
     buf
 }
 
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct TestBeaconState {
+    execution_scripts: Vec<String>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct TestShardBlock {
+    env: u64,
+    data: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct TestShardState {
+    exec_env_states: Vec<String>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct TestFile {
+    beacon_state: TestBeaconState,
+    shard_blocks: Vec<TestShardBlock>,
+    shard_pre_state: TestShardState,
+    shard_post_state: TestShardState,
+}
+
+impl From<TestBeaconState> for BeaconState {
+    fn from(input: TestBeaconState) -> Self {
+        BeaconState {
+            execution_scripts: input
+                .execution_scripts
+                .iter()
+                .map(|x| ExecutionScript { code: load_file(x) })
+                .collect(),
+        }
+    }
+}
+
+impl From<TestShardBlock> for ShardBlock {
+    fn from(input: TestShardBlock) -> Self {
+        ShardBlock {
+            env: input.env,
+            data: ShardBlockBody {
+                data: input.data.from_hex().unwrap(),
+            },
+        }
+    }
+}
+
+impl From<TestShardState> for ShardState {
+    fn from(input: TestShardState) -> Self {
+        ShardState {
+            exec_env_states: input
+                .exec_env_states
+                .iter()
+                .map(|x| {
+                    let state = x.from_hex().unwrap();
+                    assert!(state.len() == 32);
+                    let mut ret = Bytes32::default();
+                    ret.bytes.copy_from_slice(&state[..]);
+                    ret
+                })
+                .collect(),
+            slot: 0,
+            parent_block: ShardBlockHeader {},
+        }
+    }
+}
+
+fn process_yaml_test(filename: &str) {
+    println!("Process yaml!");
+    let content = load_file(&filename);
+    let test_file: TestFile = serde_yaml::from_slice::<TestFile>(&content[..]).unwrap();
+    println!("{:#?}", test_file);
+
+    let beacon_state: BeaconState = test_file.beacon_state.into();
+    let pre_state: ShardState = test_file.shard_pre_state.into();
+    let post_state: ShardState = test_file.shard_post_state.into();
+
+    let mut shard_state = pre_state;
+    for block in test_file.shard_blocks {
+        process_shard_block(&mut shard_state, &beacon_state, Some(block.into()))
+    }
+    println!("{:#?}", shard_state);
+    assert_eq!(shard_state, post_state);
+}
+
 fn main() {
+    let args: Vec<String> = env::args().collect();
+    process_yaml_test(if args.len() != 2 {
+        "test.yaml"
+    } else {
+        &args[1]
+    });
+}
+
+/*
+fn test() {
     let execution_script = load_file("phase2_helloworld.wasm");
 
     let mut shard_state = ShardState {
@@ -304,3 +400,4 @@ fn main() {
     };
     process_shard_block(&mut shard_state, &beacon_state, Some(shard_block))
 }
+*/
