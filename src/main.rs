@@ -243,7 +243,7 @@ pub fn execute_code(
 
 pub fn process_shard_block(
     state: &mut ShardState,
-    beacon_state: BeaconState,
+    beacon_state: &BeaconState,
     block: Option<ShardBlock>,
 ) {
     // println!("Beacon state: {:#?}", beacon_state);
@@ -302,5 +302,5 @@ fn main() {
         env: 1,
         data: ShardBlockBody { data: vec![] },
     };
-    process_shard_block(&mut shard_state, beacon_state, Some(shard_block))
+    process_shard_block(&mut shard_state, &beacon_state, Some(shard_block))
 }
