@@ -1,5 +1,5 @@
 /// An array of 256 bits.
-#[derive(Default, Copy, Clone, Debug)]
+#[derive(Default, PartialEq, Copy, Clone, Debug)]
 pub struct Bytes32 {
     pub bytes: [u8; 32],
 }

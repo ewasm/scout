@@ -158,17 +158,17 @@ const ZERO_HASH: Bytes32 = Bytes32 { bytes: [0u8; 32] };
 
 /// These are Phase 0 structures.
 /// https://github.com/ethereum/eth2.0-specs/blob/dev/specs/core/0_beacon-chain.md
-#[derive(Default, Clone, Debug)]
+#[derive(Default, PartialEq, Clone, Debug)]
 pub struct Deposit {}
 
 /// These are Phase 2 Proposal 2 structures.
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, PartialEq, Clone, Debug)]
 pub struct ExecutionScript {
     code: Vec<u8>,
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, PartialEq, Clone, Debug)]
 pub struct BeaconState {
     execution_scripts: Vec<ExecutionScript>,
 }
@@ -176,22 +176,22 @@ pub struct BeaconState {
 /// Shards are Phase 1 structures.
 /// https://github.com/ethereum/eth2.0-specs/blob/dev/specs/core/1_shard-data-chains.md
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, PartialEq, Clone, Debug)]
 pub struct ShardBlockHeader {}
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, PartialEq, Clone, Debug)]
 pub struct ShardBlockBody {
     data: Vec<u8>,
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, PartialEq, Clone, Debug)]
 pub struct ShardBlock {
     env: u64, // This is added by Phase 2 Proposal 2
     data: ShardBlockBody,
     // TODO: add missing fields
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, PartialEq, Clone, Debug)]
 pub struct ShardState {
     exec_env_states: Vec<Bytes32>,
     slot: u64,
