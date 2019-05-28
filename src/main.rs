@@ -22,6 +22,7 @@ const BLOCKDATASIZE_FUNC_INDEX: usize = 1;
 const BLOCKDATACOPY_FUNC_INDEX: usize = 2;
 const SAVEPOSTSTATEROOT_FUNC_INDEX: usize = 3;
 const PUSHNEWDEPOSIT_FUNC_INDEX: usize = 4;
+const EXECCODE_FUNC_INDEX: usize = 5;
 
 struct Runtime<'a> {
     pub memory: Option<MemoryRef>,
@@ -99,6 +100,25 @@ impl<'a> Externals for Runtime<'a> {
                 Ok(None)
             }
             PUSHNEWDEPOSIT_FUNC_INDEX => unimplemented!(),
+            EXECCODE_FUNC_INDEX => {
+                let ptr: u32 = args.nth(0);
+                let length: u32 = args.nth(1);
+
+                println!("execute_code at {} for {} bytes", ptr, length);
+
+                // TODO: add overflow check
+                let length = length as usize;
+
+                // TODO: add checks for out of bounds access
+                let memory = self.memory.as_ref().expect("expects memory");
+                let code = memory.get(ptr, length).unwrap();
+
+                let (post_state, deposits) = execute_code(&code, self.pre_state, self.block_data);
+
+                println!("post state: {:?}, deposits: {:?}", post_state, deposits);
+
+                Ok(None)
+            }
             _ => panic!("unknown function index"),
         }
     }
@@ -132,6 +152,10 @@ impl<'a> ModuleImportResolver for RuntimeModuleImportResolver {
             "eth2_pushNewDeposit" => FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32][..], None),
                 PUSHNEWDEPOSIT_FUNC_INDEX,
+            ),
+            "eth2_execCode" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32, ValueType::I32][..], None),
+                EXECCODE_FUNC_INDEX,
             ),
             _ => {
                 return Err(InterpreterError::Function(format!(

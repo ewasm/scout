@@ -1,0 +1,6 @@
+eth:
+  file: "target/wasm32-unknown-unknown/release/eth.wasm"
+  trimexports:
+    preset: "ewasm"
+  verifyexports:
+    preset: "ewasm"

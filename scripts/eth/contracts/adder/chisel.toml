@@ -1,0 +1,6 @@
+helloworld:
+  file: "target/wasm32-unknown-unknown/release/adder.wasm"
+  trimexports:
+    preset: "ewasm"
+  verifyexports:
+    preset: "ewasm"
