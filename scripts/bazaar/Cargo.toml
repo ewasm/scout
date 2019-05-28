@@ -9,10 +9,16 @@ publish = false
 edition = "2018"
 
 [dependencies]
-ewasm_api = { git = "https://github.com/ewasm/ewasm-rust-api", rev = "5439a75" } # eth2-phase2 branch
+#ewasm_api = { git = "https://github.com/ewasm/ewasm-rust-api", rev = "e177af3", default-features = false, features = ["std", "eth2", "qimalloc"] } # eth2-phase2 branch
 ssz = "0.1.2"
 ssz-derive = "0.1.2"
 sha3 = "^0.6"
 
 [lib]
 crate-type = ["cdylib"]
+
+[dependencies.ewasm_api]
+git = "https://github.com/ewasm/ewasm-rust-api"
+rev = "1c01982"
+default-features = false
+features = ["std", "eth2", "qimalloc"]
