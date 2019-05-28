@@ -15,10 +15,10 @@ use wasmi::{
 mod types;
 use crate::types::*;
 
-const LOADPRESTATE_FUNC_INDEX: usize = 0;
+const LOADPRESTATEROOT_FUNC_INDEX: usize = 0;
 const BLOCKDATASIZE_FUNC_INDEX: usize = 1;
 const BLOCKDATACOPY_FUNC_INDEX: usize = 2;
-const SAVEPOSTSTATE_FUNC_INDEX: usize = 3;
+const SAVEPOSTSTATEROOT_FUNC_INDEX: usize = 3;
 const PUSHNEWDEPOSIT_FUNC_INDEX: usize = 4;
 
 struct Runtime<'a> {
@@ -50,9 +50,9 @@ impl<'a> Externals for Runtime<'a> {
         args: RuntimeArgs,
     ) -> Result<Option<RuntimeValue>, Trap> {
         match index {
-            LOADPRESTATE_FUNC_INDEX => {
+            LOADPRESTATEROOT_FUNC_INDEX => {
                 let ptr: u32 = args.nth(0);
-                println!("loadprestate to {}", ptr);
+                println!("loadprestateroot to {}", ptr);
 
                 // TODO: add checks for out of bounds access
                 let memory = self.memory.as_ref().expect("expects memory");
@@ -60,9 +60,9 @@ impl<'a> Externals for Runtime<'a> {
 
                 Ok(None)
             }
-            SAVEPOSTSTATE_FUNC_INDEX => {
+            SAVEPOSTSTATEROOT_FUNC_INDEX => {
                 let ptr: u32 = args.nth(0);
-                println!("savepoststate from {}", ptr);
+                println!("savepoststateroot from {}", ptr);
 
                 // TODO: add checks for out of bounds access
                 let memory = self.memory.as_ref().expect("expects memory");
@@ -111,9 +111,9 @@ impl<'a> ModuleImportResolver for RuntimeModuleImportResolver {
         _signature: &Signature,
     ) -> Result<FuncRef, InterpreterError> {
         let func_ref = match field_name {
-            "eth2_loadPreState" => FuncInstance::alloc_host(
+            "eth2_loadPreStateRoot" => FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32][..], None),
-                LOADPRESTATE_FUNC_INDEX,
+                LOADPRESTATEROOT_FUNC_INDEX,
             ),
             "eth2_blockDataSize" => FuncInstance::alloc_host(
                 Signature::new(&[][..], Some(ValueType::I32)),
@@ -123,9 +123,9 @@ impl<'a> ModuleImportResolver for RuntimeModuleImportResolver {
                 Signature::new(&[ValueType::I32, ValueType::I32, ValueType::I32][..], None),
                 BLOCKDATACOPY_FUNC_INDEX,
             ),
-            "eth2_savePostState" => FuncInstance::alloc_host(
+            "eth2_savePostStateRoot" => FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32][..], None),
-                SAVEPOSTSTATE_FUNC_INDEX,
+                SAVEPOSTSTATEROOT_FUNC_INDEX,
             ),
             "eth2_pushNewDeposit" => FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32][..], None),

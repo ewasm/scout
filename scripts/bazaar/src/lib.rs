@@ -66,12 +66,11 @@ impl StateRoot for State {
     }
 }
 
-fn process_block(pre_state: types::Bytes32, mut block_data: &[u8]) -> types::Bytes32 {
+fn process_block(pre_state_root: types::Bytes32, mut block_data: &[u8]) -> types::Bytes32 {
     let mut block = InputBlock::decode(&mut block_data).expect("valid input");
 
     // Validate pre state
-    // FIXME: add PartialEq on Bytes32
-    assert!(block.state.state_root().bytes == pre_state.bytes);
+    assert!(block.state.state_root() == pre_state_root);
 
     for message in block.new_messages {
         block.state.messages.push(message)
@@ -86,10 +85,10 @@ fn process_block(pre_state: types::Bytes32, mut block_data: &[u8]) -> types::Byt
 #[cfg(not(test))]
 #[no_mangle]
 pub extern "C" fn main() {
-    let pre_state = eth2::load_pre_state();
+    let pre_state_root = eth2::load_pre_state_root();
     let block_data = eth2::acquire_block_data();
-    let post_state = process_block(pre_state, &block_data);
-    eth2::save_post_state(post_state)
+    let post_state_root = process_block(pre_state_root, &block_data);
+    eth2::save_post_state_root(post_state_root)
 }
 
 #[cfg(test)]
@@ -110,8 +109,7 @@ mod tests {
                     198, 161, 156, 216, 208, 233, 243, 123, 170, 173, 242, 86, 65, 66, 244
                 ]
         );
-        // FIXME: add PartialEq to ewasm-rust-api
-        assert!(pre_state.bytes == post_state.bytes)
+        assert!(pre_state == post_state)
     }
 
     #[test]
