@@ -475,6 +475,8 @@ impl<'a> ModuleImportResolver for DebugImportResolver {
 }
 
 const BYTES_PER_SHARD_BLOCK_BODY: usize = 16384;
+const LATEST_STATE_ROOTS_LENGTH: usize = 32;
+// This is equivalent to Bytes32::default()
 const ZERO_HASH: Bytes32 = Bytes32 { bytes: [0u8; 32] };
 
 #[derive(Default, PartialEq, Clone, Debug, Ssz)]
@@ -568,8 +570,7 @@ pub struct ShardState {
     exec_env_states: Vec<Bytes32>,
     slot: u64,
     parent_block: ShardBlockHeader,
-    // TODO: add missing field
-    // latest_state_roots: [bytes32, LATEST_STATE_ROOTS_LEMGTH]
+    latest_state_roots: [Bytes32; LATEST_STATE_ROOTS_LENGTH],
 }
 
 impl fmt::Display for ShardBlockBody {
@@ -651,7 +652,9 @@ pub fn process_shard_block(
 
     info!("Pre-execution: {}", state);
 
-    // TODO: implement state root handling
+    let pre_state_root: Bytes32 = Bytes32::default(); // FIXME this should be hash_tree_root(state)
+    state.latest_state_roots[(state.slot as usize) % LATEST_STATE_ROOTS_LENGTH] = pre_state_root;
+    state.slot += 1;
 
     let deposit_receipts = if let Some(block) = block {
         info!("Executing block: {}", block);
@@ -661,9 +664,9 @@ pub fn process_shard_block(
         let code = &beacon_state.execution_scripts[env].code;
 
         // Set post states to empty for any holes
-        // for x in 0..env {
-        //     state.exec_env_states.push(ZERO_HASH)
-        // }
+        for _ in 0..env {
+            state.exec_env_states.push(ZERO_HASH)
+        }
         let pre_state = &state.exec_env_states[env];
         let (post_state, deposits) = execute_code(code, pre_state, &block.data)?;
         state.exec_env_states[env] = post_state;
@@ -810,6 +813,7 @@ impl TryFrom<TestShardState> for ShardState {
             exec_env_states: states?,
             slot: 0,
             parent_block: ShardBlockHeader {},
+            latest_state_roots: [Bytes32::default(); 32],
         })
     }
 }
