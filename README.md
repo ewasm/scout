@@ -52,7 +52,7 @@ The runner expects a filename pointing to the test file or will default to `test
 
 ## How to code scripts?
 
-An example script is located in `scripts/helloworld`. It uses a branch of [ewasm-rust-api](https://github.com/ewasm/ewasm-rust-api/tree/eth2-phase2).
+An example script is located in `scripts/helloworld`. It uses [ewasm-rust-api](https://github.com/ewasm/ewasm-rust-api) with the experimental `eth2` feature.
 
 ```rust
 extern crate ewasm_api;
