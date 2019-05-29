@@ -60,7 +60,7 @@ fn process_block(pre_state: types::Bytes32, mut block_data: &[u8]) -> types::Byt
 
             block.state.storage.push(Storage { code: tx.data });
         } else {
-            eth2::exec_code(&block.state.storage[tx.target as usize].code);
+            // eth2::exec_code(&block.state.storage[tx.target as usize].code);
         }
     }
 
@@ -81,13 +81,36 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore]
+    fn create_inputs() {
+        let mut block = InputBlock::default();
+        let tx = Transaction {
+            target: 0,
+            // adder.wasm
+            data: vec![
+                0, 97, 115, 109, 1, 0, 0, 0, 1, 132, 128, 128, 128, 0, 1, 96, 0, 0, 3, 130, 128,
+                128, 128, 0, 1, 0, 5, 131, 128, 128, 128, 0, 1, 0, 16, 7, 145, 128, 128, 128, 0, 2,
+                6, 109, 101, 109, 111, 114, 121, 2, 0, 4, 109, 97, 105, 110, 0, 0, 10, 132, 128,
+                128, 128, 0, 1, 2, 0, 11, 0, 146, 128, 128, 128, 0, 4, 110, 97, 109, 101, 1, 135,
+                128, 128, 128, 0, 1, 0, 4, 109, 97, 105, 110, 0, 222, 128, 128, 128, 0, 9, 112,
+                114, 111, 100, 117, 99, 101, 114, 115, 2, 8, 108, 97, 110, 103, 117, 97, 103, 101,
+                1, 4, 82, 117, 115, 116, 4, 50, 48, 49, 56, 12, 112, 114, 111, 99, 101, 115, 115,
+                101, 100, 45, 98, 121, 2, 5, 114, 117, 115, 116, 99, 29, 49, 46, 51, 52, 46, 48,
+                32, 40, 57, 49, 56, 53, 54, 101, 100, 53, 50, 32, 50, 48, 49, 57, 45, 48, 52, 45,
+                49, 48, 41, 6, 119, 97, 108, 114, 117, 115, 5, 48, 46, 52, 46, 48,
+            ],
+        };
+
+        block.transactions.push(tx);
+
+        println!("{:?}", block.encode());
+        println!("{}", hex::encode(block.encode()));
+    }
+
+    #[test]
     fn empty_block() {
         let block = InputBlock::default();
-
-        // Lets say the previous state was empty
         let pre_state = block.state.state_root();
-
-        // Process the input block, we're adding nothing to it
         let post_state = process_block(pre_state, &block.encode());
 
         assert!(
@@ -99,5 +122,48 @@ mod tests {
         );
 
         assert!(pre_state.bytes == post_state.bytes)
+    }
+
+    #[test]
+    fn store_multiple_contracts() {
+        let mut block = InputBlock::default();
+
+        let contract = vec![
+            0, 97, 115, 109, 1, 0, 0, 0, 1, 132, 128, 128, 128, 0, 1, 96, 0, 0, 3, 130, 128, 128,
+            128, 0, 1, 0, 5, 131, 128, 128, 128, 0, 1, 0, 16, 7, 145, 128, 128, 128, 0, 2, 6, 109,
+            101, 109, 111, 114, 121, 2, 0, 4, 109, 97, 105, 110, 0, 0, 10, 132, 128, 128, 128, 0,
+            1, 2, 0, 11, 0, 146, 128, 128, 128, 0, 4, 110, 97, 109, 101, 1, 135, 128, 128, 128, 0,
+            1, 0, 4, 109, 97, 105, 110, 0, 222, 128, 128, 128, 0, 9, 112, 114, 111, 100, 117, 99,
+            101, 114, 115, 2, 8, 108, 97, 110, 103, 117, 97, 103, 101, 1, 4, 82, 117, 115, 116, 4,
+            50, 48, 49, 56, 12, 112, 114, 111, 99, 101, 115, 115, 101, 100, 45, 98, 121, 2, 5, 114,
+            117, 115, 116, 99, 29, 49, 46, 51, 52, 46, 48, 32, 40, 57, 49, 56, 53, 54, 101, 100,
+            53, 50, 32, 50, 48, 49, 57, 45, 48, 52, 45, 49, 48, 41, 6, 119, 97, 108, 114, 117, 115,
+            5, 48, 46, 52, 46, 48,
+        ];
+
+        let tx = Transaction {
+            target: 0,
+            data: contract.clone(),
+        };
+
+        block.transactions.push(tx);
+
+        let pre_state = block.state.state_root();
+        let post_state = process_block(pre_state, &block.encode());
+
+        let result = State {
+            storage: vec![
+                Storage {
+                    code: contract.clone(),
+                },
+                Storage {
+                    code: contract.clone(),
+                },
+            ],
+        };
+
+        println!("{:?}", post_state.bytes);
+        println!("{:?}", result.state_root().bytes);
+        assert!(post_state.bytes == result.state_root().bytes);
     }
 }

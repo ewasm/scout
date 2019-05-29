@@ -10,6 +10,7 @@ ewasm_api = { git = "https://github.com/c-o-l-o-r/ewasm-rust-api", branch = "add
 ssz = "0.1.2"
 ssz-derive = "0.1.2"
 sha3 = "^0.6"
+hex = "0.3.2"
 
 [lib]
 crate-type = ["cdylib"]
