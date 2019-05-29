@@ -3,10 +3,14 @@ extern crate wasmi;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+extern crate ssz;
+#[macro_use]
+extern crate ssz_derive;
 
 use primitive_types::U256;
 use rustc_hex::{FromHex, ToHex};
 use serde::{Deserialize, Serialize};
+use ssz::{Decode, Encode};
 use std::env;
 use std::error::Error;
 use std::fmt;
@@ -435,10 +439,61 @@ impl<'a> ModuleImportResolver for DebugImportResolver {
 const BYTES_PER_SHARD_BLOCK_BODY: usize = 16384;
 const ZERO_HASH: Bytes32 = Bytes32 { bytes: [0u8; 32] };
 
+#[derive(Default, PartialEq, Clone, Debug, Ssz)]
+pub struct Hash([u8; 32]);
+
+#[derive(Clone, Ssz)]
+pub struct BLSPubKey([u8; 48]);
+
+impl PartialEq for BLSPubKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.0[..] == other.0[..]
+    }
+}
+
+impl Default for BLSPubKey {
+    fn default() -> Self {
+        BLSPubKey { 0: [0u8; 48] }
+    }
+}
+
+impl fmt::Debug for BLSPubKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0.to_hex())
+    }
+}
+
+#[derive(Clone, Ssz)]
+pub struct BLSSignature([u8; 96]);
+
+impl PartialEq for BLSSignature {
+    fn eq(&self, other: &Self) -> bool {
+        self.0[..] == other.0[..]
+    }
+}
+
+impl Default for BLSSignature {
+    fn default() -> Self {
+        BLSSignature { 0: [0u8; 96] }
+    }
+}
+
+impl fmt::Debug for BLSSignature {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0.to_hex())
+    }
+}
+
 /// These are Phase 0 structures.
 /// https://github.com/ethereum/eth2.0-specs/blob/dev/specs/core/0_beacon-chain.md
-#[derive(Default, PartialEq, Clone, Debug)]
-pub struct Deposit {}
+/// basically this is a little-endian tightly packed representation of those fields.
+#[derive(Default, PartialEq, Clone, Debug, Ssz)]
+pub struct Deposit {
+    pubkey: BLSPubKey,
+    withdrawal_credentials: Hash,
+    amount: u64,
+    signature: BLSSignature,
+}
 
 /// These are Phase 2 Proposal 2 structures.
 
