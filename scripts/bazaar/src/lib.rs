@@ -82,12 +82,21 @@ fn process_block(pre_state_root: types::Bytes32, mut block_data: &[u8]) -> types
     block.state.state_root()
 }
 
+#[derive(Default, PartialEq, Clone, Debug, Ssz)]
+pub struct Deposit {
+    pubkey: Vec<u8>, // 48 bytes
+    withdrawal_credentials: Vec<u8>, // 32 bytes
+    amount: u64,
+    signature: Vec<u8>, // 96 bytes
+}
+
 #[cfg(not(test))]
 #[no_mangle]
 pub extern "C" fn main() {
     let pre_state_root = eth2::load_pre_state_root();
     let block_data = eth2::acquire_block_data();
     let post_state_root = process_block(pre_state_root, &block_data);
+    eth2::push_new_deposit(&Deposit::default().encode());
     eth2::save_post_state_root(&post_state_root)
 }
 
