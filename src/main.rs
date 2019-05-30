@@ -104,7 +104,7 @@ impl<'a> Externals for Runtime<'a> {
                 let ptr: u32 = args.nth(0);
                 let length: u32 = args.nth(1);
 
-                println!("execute_code at {} for {} bytes", ptr, length);
+                println!("EEI execute_code at {} for {} bytes", ptr, length);
 
                 // TODO: add overflow check
                 let length = length as usize;
@@ -113,7 +113,8 @@ impl<'a> Externals for Runtime<'a> {
                 let memory = self.memory.as_ref().expect("expects memory");
                 let code = memory.get(ptr, length).unwrap();
 
-                let (post_state, deposits) = execute_code(&code, self.pre_state, self.block_data);
+                let (post_state, deposits) =
+                    execute_code(&code, self.pre_state, &ShardBlockBody { data: vec![] });
 
                 println!("post state: {:?}, deposits: {:?}", post_state, deposits);
 
