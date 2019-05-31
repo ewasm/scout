@@ -5,8 +5,10 @@ use rustc_hex::FromHex;
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Keccak256};
 use sszt::yaml::to_ssz;
+use std::cell::RefCell;
 use std::env;
 use std::fs::File;
+use std::rc::Rc;
 use wasmi::memory_units::Pages;
 use wasmi::{
     Error as InterpreterError, Externals, FuncInstance, FuncRef, ImportsBuilder, MemoryInstance,
@@ -17,32 +19,53 @@ use wasmi::{
 mod types;
 use crate::types::*;
 
+type Context = Rc<RefCell<Vec<u8>>>;
+
 const LOADPRESTATEROOT_FUNC_INDEX: usize = 0;
 const BLOCKDATASIZE_FUNC_INDEX: usize = 1;
 const BLOCKDATACOPY_FUNC_INDEX: usize = 2;
 const SAVEPOSTSTATEROOT_FUNC_INDEX: usize = 3;
 const PUSHNEWDEPOSIT_FUNC_INDEX: usize = 4;
 const EXECCODE_FUNC_INDEX: usize = 5;
+const GETCONTEXT_FUNC_INDEX: usize = 6;
+const RETURNDATASIZE_FUNC_INDEX: usize = 7;
+const RETURNDATACOPY_FUNC_INDEX: usize = 8;
+const SAVERETURNDATA_FUNC_INDEX: usize = 9;
+const CONTEXTDATASIZE_FUNC_INDEX: usize = 10;
+const CONTEXTDATACOPY_FUNC_INDEX: usize = 11;
+const PRINT_FUNC_INDEX: usize = 100;
 
 struct Runtime<'a> {
     pub memory: Option<MemoryRef>,
+    pub context: Context,
     pre_state: &'a Bytes32,
     block_data: &'a ShardBlockBody,
+    return_data: Vec<u8>,
     post_state: Bytes32,
 }
 
 impl<'a> Runtime<'a> {
-    fn new(pre_state: &'a Bytes32, block_data: &'a ShardBlockBody) -> Runtime<'a> {
+    fn new(
+        pre_state: &'a Bytes32,
+        block_data: &'a ShardBlockBody,
+        context: Context,
+    ) -> Runtime<'a> {
         Runtime {
             memory: Some(MemoryInstance::alloc(Pages(1), Some(Pages(1))).unwrap()),
+            context: context,
             pre_state: pre_state,
             block_data: block_data,
+            return_data: vec![],
             post_state: Bytes32::default(),
         }
     }
 
     fn get_post_state(&self) -> Bytes32 {
         self.post_state
+    }
+
+    fn get_return_data(&self) -> Vec<u8> {
+        self.return_data.clone()
     }
 }
 
@@ -99,28 +122,102 @@ impl<'a> Externals for Runtime<'a> {
 
                 Ok(None)
             }
-            PUSHNEWDEPOSIT_FUNC_INDEX => unimplemented!(),
-            EXECCODE_FUNC_INDEX => {
+            RETURNDATASIZE_FUNC_INDEX => {
+                let ret: i32 = self.return_data.len() as i32;
+                println!("returndatasize {}", ret);
+                Ok(Some(ret.into()))
+            }
+            RETURNDATACOPY_FUNC_INDEX => {
                 let ptr: u32 = args.nth(0);
-                let length: u32 = args.nth(1);
-
-                println!("EEI execute_code at {} for {} bytes", ptr, length);
+                let offset: u32 = args.nth(1);
+                let length: u32 = args.nth(2);
+                println!(
+                    "blockdatacopy to {} from {} for {} bytes",
+                    ptr, offset, length
+                );
 
                 // TODO: add overflow check
+                let offset = offset as usize;
                 let length = length as usize;
 
                 // TODO: add checks for out of bounds access
                 let memory = self.memory.as_ref().expect("expects memory");
-                let code = memory.get(ptr, length).unwrap();
-
-                let (post_state, deposits) =
-                    execute_code(&code, self.pre_state, &ShardBlockBody { data: vec![] });
-
-                println!("post state: {:?}, deposits: {:?}", post_state, deposits);
+                memory.set(ptr, &self.return_data[offset..length]).unwrap();
 
                 Ok(None)
             }
-            _ => panic!("unknown function index"),
+            SAVERETURNDATA_FUNC_INDEX => {
+                let ptr: u32 = args.nth(0);
+                let length: u32 = args.nth(1);
+
+                println!("savereturndata from {}", ptr);
+
+                let memory = self.memory.as_ref().expect("expects memory");
+                let return_data = memory.get(ptr, length as usize).unwrap();
+
+                self.return_data = return_data;
+
+                Ok(None)
+            }
+            PUSHNEWDEPOSIT_FUNC_INDEX => unimplemented!(),
+            EXECCODE_FUNC_INDEX => {
+                let code_ptr: u32 = args.nth(0);
+                let code_length: u32 = args.nth(1);
+                let calldata_ptr: u32 = args.nth(2);
+                let calldata_length: u32 = args.nth(3);
+                let ctx_ptr: u32 = args.nth(4);
+                let ctx_length: u32 = args.nth(5);
+
+                println!("EEI execute_code at {} for {} bytes", code_ptr, code_length);
+
+                let memory = self.memory.as_ref().expect("expects memory");
+                let code = memory.get(code_ptr, code_length as usize).unwrap();
+                let calldata = memory.get(calldata_ptr, calldata_length as usize).unwrap();
+                let ctx = memory.get(ctx_ptr, ctx_length as usize).unwrap();
+
+                *self.context.borrow_mut() = ctx;
+
+                let (_, _, return_data) = execute_code(
+                    &code,
+                    self.pre_state,
+                    &ShardBlockBody { data: calldata },
+                    self.context.clone(),
+                );
+
+                self.return_data = return_data;
+
+                Ok(None)
+            }
+            GETCONTEXT_FUNC_INDEX => {
+                let ptr: u32 = args.nth(0);
+                let offset: u32 = args.nth(1);
+                let length: u32 = args.nth(2);
+
+                println!("getcontext to {} from {} for {} bytes", ptr, offset, length);
+
+                let offset = offset as usize;
+                let length = length as usize;
+                let memory = self.memory.as_ref().expect("expects memory");
+
+                memory.set(ptr, &self.context.borrow()[offset..length]);
+
+                Ok(None)
+            }
+            PRINT_FUNC_INDEX => {
+                let ptr: u32 = args.nth(0);
+                let length: u32 = args.nth(1);
+
+                let memory = self.memory.as_ref().expect("expects memory");
+                let obj = memory.get(ptr, length as usize).unwrap();
+
+                println!("{:?}", obj);
+
+                Ok(None)
+            }
+            a => {
+                println!("{}", a);
+                panic!("unknown function index")
+            }
         }
     }
 }
@@ -146,6 +243,26 @@ impl<'a> ModuleImportResolver for RuntimeModuleImportResolver {
                 Signature::new(&[ValueType::I32, ValueType::I32, ValueType::I32][..], None),
                 BLOCKDATACOPY_FUNC_INDEX,
             ),
+            "eth2_returnDataSize" => FuncInstance::alloc_host(
+                Signature::new(&[][..], Some(ValueType::I32)),
+                RETURNDATASIZE_FUNC_INDEX,
+            ),
+            "eth2_returnDataCopy" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32, ValueType::I32, ValueType::I32][..], None),
+                RETURNDATACOPY_FUNC_INDEX,
+            ),
+            "eth2_saveReturnData" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32, ValueType::I32][..], None),
+                SAVERETURNDATA_FUNC_INDEX,
+            ),
+            "eth2_contextDataSize" => FuncInstance::alloc_host(
+                Signature::new(&[][..], Some(ValueType::I32)),
+                CONTEXTDATASIZE_FUNC_INDEX,
+            ),
+            "eth2_contextDataCopy" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32, ValueType::I32, ValueType::I32][..], None),
+                CONTEXTDATACOPY_FUNC_INDEX,
+            ),
             "eth2_savePostStateRoot" => FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32][..], None),
                 SAVEPOSTSTATEROOT_FUNC_INDEX,
@@ -155,8 +272,22 @@ impl<'a> ModuleImportResolver for RuntimeModuleImportResolver {
                 PUSHNEWDEPOSIT_FUNC_INDEX,
             ),
             "eth2_execCode" => FuncInstance::alloc_host(
-                Signature::new(&[ValueType::I32, ValueType::I32][..], None),
+                Signature::new(
+                    &[
+                        ValueType::I32,
+                        ValueType::I32,
+                        ValueType::I32,
+                        ValueType::I32,
+                        ValueType::I32,
+                        ValueType::I32,
+                    ][..],
+                    None,
+                ),
                 EXECCODE_FUNC_INDEX,
+            ),
+            "print" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32, ValueType::I32][..], None),
+                PRINT_FUNC_INDEX,
             ),
             _ => {
                 return Err(InterpreterError::Function(format!(
@@ -220,7 +351,8 @@ pub fn execute_code(
     code: &[u8],
     pre_state: &Bytes32,
     block_data: &ShardBlockBody,
-) -> (Bytes32, Vec<Deposit>) {
+    context: Context,
+) -> (Bytes32, Vec<Deposit>, Vec<u8>) {
     println!(
         "Executing codesize({}) and data: {:#?}",
         code.len(),
@@ -236,7 +368,7 @@ pub fn execute_code(
         .unwrap()
         .assert_no_start();
 
-    let mut runtime = Runtime::new(pre_state, block_data);
+    let mut runtime = Runtime::new(pre_state, block_data, context.clone());
 
     let internal_mem = instance
         .export_by_name("memory")
@@ -254,7 +386,11 @@ pub fn execute_code(
     println!("Result: {:?}", result);
     println!("Execution finished");
 
-    (runtime.get_post_state(), vec![Deposit {}])
+    (
+        runtime.get_post_state(),
+        vec![Deposit {}],
+        runtime.get_return_data(),
+    )
 }
 
 pub fn process_shard_block(
@@ -278,8 +414,11 @@ pub fn process_shard_block(
         // for x in 0..env {
         //     state.exec_env_states.push(ZERO_HASH)
         // }
+
+        let context: Context = Default::default();
         let pre_state = &state.exec_env_states[env];
-        let (post_state, deposits) = execute_code(code, pre_state, &block.data);
+        let (post_state, deposits, _) = execute_code(code, pre_state, &block.data, context.clone());
+
         state.exec_env_states[env] = post_state
     }
 

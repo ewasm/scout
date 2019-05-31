@@ -6,7 +6,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
-ewasm_api = { git = "https://github.com/c-o-l-o-r/ewasm-rust-api", branch = "add-exec-code", features = ["eth2"] }
+ewasm_api = { git = "https://github.com/c-o-l-o-r/ewasm-rust-api", rev = "65b5316d0a0ae78e94be4c5d3153231cbc6653f1", features = ["eth2"] }
 ssz = "0.1.2"
 ssz-derive = "0.1.2"
 sha3 = "^0.6"
