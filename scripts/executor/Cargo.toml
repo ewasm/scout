@@ -1,12 +1,12 @@
 [package]
-name = "eth"
+name = "executor"
 version = "0.0.0"
 authors = ["Matt Garnett <14004106+c-o-l-o-r@users.noreply.github.com>"]
 publish = false
 edition = "2018"
 
 [dependencies]
-ewasm_api = { git = "https://github.com/c-o-l-o-r/ewasm-rust-api", rev = "65b5316d0a0ae78e94be4c5d3153231cbc6653f1", features = ["eth2"] }
+ewasm_api = { git = "https://github.com/c-o-l-o-r/ewasm-rust-api", rev = "b10cba54fe6fba8c782a70e1280985421d35cf9a", features = ["eth2"] }
 ssz = "0.1.2"
 ssz-derive = "0.1.2"
 sha3 = "^0.6"

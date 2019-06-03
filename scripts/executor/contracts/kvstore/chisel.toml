@@ -1,5 +1,5 @@
-helloworld:
-  file: "target/wasm32-unknown-unknown/release/adder.wasm"
+kvstore:
+  file: "target/wasm32-unknown-unknown/release/kvstore.wasm"
   trimexports:
     preset: "ewasm"
   verifyexports:

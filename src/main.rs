@@ -132,7 +132,7 @@ impl<'a> Externals for Runtime<'a> {
                 let offset: u32 = args.nth(1);
                 let length: u32 = args.nth(2);
                 println!(
-                    "blockdatacopy to {} from {} for {} bytes",
+                    "returndatacopy to {} from {} for {} bytes",
                     ptr, offset, length
                 );
 
@@ -143,6 +143,32 @@ impl<'a> Externals for Runtime<'a> {
                 // TODO: add checks for out of bounds access
                 let memory = self.memory.as_ref().expect("expects memory");
                 memory.set(ptr, &self.return_data[offset..length]).unwrap();
+
+                Ok(None)
+            }
+            CONTEXTDATASIZE_FUNC_INDEX => {
+                let ret: i32 = self.context.borrow().len() as i32;
+                println!("contextdatasize {}", ret);
+                Ok(Some(ret.into()))
+            }
+            CONTEXTDATACOPY_FUNC_INDEX => {
+                let ptr: u32 = args.nth(0);
+                let offset: u32 = args.nth(1);
+                let length: u32 = args.nth(2);
+                println!(
+                    "contextdatacopy to {} from {} for {} bytes",
+                    ptr, offset, length
+                );
+
+                // TODO: add overflow check
+                let offset = offset as usize;
+                let length = length as usize;
+
+                // TODO: add checks for out of bounds access
+                let memory = self.memory.as_ref().expect("expects memory");
+                memory
+                    .set(ptr, &self.context.borrow()[offset..length])
+                    .unwrap();
 
                 Ok(None)
             }
@@ -214,10 +240,7 @@ impl<'a> Externals for Runtime<'a> {
 
                 Ok(None)
             }
-            a => {
-                println!("{}", a);
-                panic!("unknown function index")
-            }
+            index => panic!("unknown function index: {}", index),
         }
     }
 }
@@ -353,11 +376,11 @@ pub fn execute_code(
     block_data: &ShardBlockBody,
     context: Context,
 ) -> (Bytes32, Vec<Deposit>, Vec<u8>) {
-    println!(
-        "Executing codesize({}) and data: {:#?}",
-        code.len(),
-        block_data
-    );
+    // println!(
+    //     "Executing codesize({}) and data: {:#?}",
+    //     code.len(),
+    //     block_data
+    // );
 
     let module = Module::from_buffer(&code).unwrap();
     let mut imports = ImportsBuilder::new();
@@ -399,9 +422,9 @@ pub fn process_shard_block(
     block: Option<ShardBlock>,
 ) {
     // println!("Beacon state: {:#?}", beacon_state);
-    println!("Executing block: {:#?}", block);
+    // println!("Executing block: {:#?}", block);
 
-    println!("Pre-execution: {:#?}", state);
+    // println!("Pre-execution: {:#?}", state);
 
     // TODO: implement state root handling
 
@@ -424,7 +447,7 @@ pub fn process_shard_block(
 
     // TODO: implement state + deposit root handling
 
-    println!("Post-execution: {:#?}", state)
+    // println!("Post-execution: {:#?}", state)
 }
 
 fn load_file(filename: &str) -> Vec<u8> {

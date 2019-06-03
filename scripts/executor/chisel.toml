@@ -1,5 +1,5 @@
-eth:
-  file: "target/wasm32-unknown-unknown/release/eth.wasm"
+executor:
+  file: "target/wasm32-unknown-unknown/release/executor.wasm"
   trimexports:
     preset: "ewasm"
   verifyexports:
