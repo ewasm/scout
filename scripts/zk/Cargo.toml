@@ -1,0 +1,24 @@
+[package]
+name = "phase2-zk"
+version = "0.0.0"
+license = "Apache-2.0"
+repository = "https://github.com/ewasm/scout"
+description = "Eth 2.0 Phase 2 execution script: zk"
+publish = false
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+bellman = "0.1"
+
+[dependencies.pairing]
+version = "0.14"
+features = ["u128-support"]
+
+[dependencies.ewasm_api]
+git = "https://github.com/ewasm/ewasm-rust-api"
+rev = "1c01982"
+default-features = false
+features = ["std", "eth2", "wee_alloc"]

@@ -1,0 +1,6 @@
+zk:
+  file: "target/wasm32-unknown-unknown/release/phase2_zk.wasm"
+  trimexports:
+    preset: "ewasm"
+  verifyexports:
+    preset: "ewasm"
