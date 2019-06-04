@@ -16,3 +16,7 @@ git = "https://github.com/ewasm/ewasm-rust-api"
 rev = "1c01982"
 default-features = false
 features = ["std", "eth2", "qimalloc"]
+
+[profile.release]
+lto = true
+debug = false
