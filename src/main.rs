@@ -142,18 +142,6 @@ impl<'a> ModuleImportResolver for RuntimeModuleImportResolver {
     }
 }
 
-fn wasm_load_from_file(filename: &str) -> Module {
-    use std::io::prelude::*;
-    let mut file = File::open(filename).unwrap();
-    let mut buf = Vec::new();
-    file.read_to_end(&mut buf).unwrap();
-    Module::from_buffer(buf).unwrap()
-}
-
-fn wasm_load_from_blob(buf: &[u8]) -> Module {
-    Module::from_buffer(buf).unwrap()
-}
-
 const BYTES_PER_SHARD_BLOCK_BODY: usize = 16384;
 const ZERO_HASH: Bytes32 = Bytes32 { bytes: [0u8; 32] };
 
@@ -212,7 +200,7 @@ pub fn execute_code(
         block_data
     );
 
-    let module = wasm_load_from_blob(&code);
+    let module = Module::from_buffer(&code).unwrap();
     let mut imports = ImportsBuilder::new();
     // FIXME: use eth2
     imports.push_resolver("env", &RuntimeModuleImportResolver);
@@ -374,30 +362,3 @@ fn main() {
         &args[1]
     });
 }
-
-/*
-fn test() {
-    let execution_script = load_file("phase2_helloworld.wasm");
-
-    let mut shard_state = ShardState {
-        exec_env_states: vec![Bytes32::default()],
-        slot: 0,
-        parent_block: ShardBlockHeader {},
-    };
-    let beacon_state = BeaconState {
-        execution_scripts: vec![
-            ExecutionScript {
-                code: execution_script.to_vec(),
-            },
-            ExecutionScript {
-                code: execution_script.to_vec(),
-            },
-        ],
-    };
-    let shard_block = ShardBlock {
-        env: 1,
-        data: ShardBlockBody { data: vec![] },
-    };
-    process_shard_block(&mut shard_state, &beacon_state, Some(shard_block))
-}
-*/
