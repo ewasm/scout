@@ -4,3 +4,5 @@ zk:
     preset: "ewasm"
   verifyexports:
     preset: "ewasm"
+  repack:
+    preset: "ewasm"
