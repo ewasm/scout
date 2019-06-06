@@ -1,0 +1,8 @@
+helloworld:
+  file: "target/wasm32-unknown-unknown/release/balls.wasm"
+  trimexports:
+    preset: "ewasm"
+  verifyexports:
+    preset: "ewasm"
+  snip:
+    preset: "ewasm"

@@ -1,0 +1,25 @@
+[package]
+name = "balls"
+version = "0.0.0"
+authors = ["Jake Lang <jak3lang@gmail.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/ewasm/scout"
+publish = false
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ewasm_api = { version = "0.11", features = ["std", "eth2", "qimalloc", "debug"] }
+ssz = "0.1.2"
+ssz-derive = "0.1.2"
+
+# Use a feature branch to allow hash-to-curve.
+[dependencies.pairing]
+git = "https://github.com/mmaker/pairing"
+branch = "feature/hashing"
+
+[profile.release]
+lto = true
+debug = false
