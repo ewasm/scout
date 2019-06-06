@@ -55,8 +55,10 @@ impl<'a> Externals for Runtime<'a> {
                 println!("loadprestateroot to {}", ptr);
 
                 // TODO: add checks for out of bounds access
-                let memory = self.memory.as_ref().expect("expects memory");
-                memory.set(ptr, &self.pre_state.bytes).unwrap();
+                let memory = self.memory.as_ref().expect("expects memory object");
+                memory
+                    .set(ptr, &self.pre_state.bytes)
+                    .expect("expects writing to memory to succeed");
 
                 Ok(None)
             }
@@ -65,8 +67,10 @@ impl<'a> Externals for Runtime<'a> {
                 println!("savepoststateroot from {}", ptr);
 
                 // TODO: add checks for out of bounds access
-                let memory = self.memory.as_ref().expect("expects memory");
-                memory.get_into(ptr, &mut self.post_state.bytes).unwrap();
+                let memory = self.memory.as_ref().expect("expects memory object");
+                memory
+                    .get_into(ptr, &mut self.post_state.bytes)
+                    .expect("expects reading from memory to succeed");
 
                 Ok(None)
             }
@@ -89,10 +93,10 @@ impl<'a> Externals for Runtime<'a> {
                 let length = length as usize;
 
                 // TODO: add checks for out of bounds access
-                let memory = self.memory.as_ref().expect("expects memory");
+                let memory = self.memory.as_ref().expect("expects memory object");
                 memory
                     .set(ptr, &self.block_data.data[offset..length])
-                    .unwrap();
+                    .expect("expects writing to memory to succeed");
 
                 Ok(None)
             }
@@ -200,13 +204,13 @@ pub fn execute_code(
         block_data
     );
 
-    let module = Module::from_buffer(&code).unwrap();
+    let module = Module::from_buffer(&code).expect("Module loading to succeed");
     let mut imports = ImportsBuilder::new();
     // FIXME: use eth2
     imports.push_resolver("env", &RuntimeModuleImportResolver);
 
     let instance = ModuleInstance::new(&module, &imports)
-        .unwrap()
+        .expect("Module instantation expected to succeed")
         .assert_no_start();
 
     let mut runtime = Runtime::new(pre_state, block_data);
@@ -263,9 +267,9 @@ pub fn process_shard_block(
 
 fn load_file(filename: &str) -> Vec<u8> {
     use std::io::prelude::*;
-    let mut file = File::open(filename).unwrap();
+    let mut file = File::open(filename).expect("loading file failed");
     let mut buf = Vec::new();
-    file.read_to_end(&mut buf).unwrap();
+    file.read_to_end(&mut buf).expect("reading file failed");
     buf
 }
 
@@ -310,7 +314,7 @@ impl From<TestShardBlock> for ShardBlock {
         ShardBlock {
             env: input.env,
             data: ShardBlockBody {
-                data: input.data.from_hex().unwrap(),
+                data: input.data.from_hex().expect("invalid hex data"),
             },
         }
     }
@@ -323,7 +327,7 @@ impl From<TestShardState> for ShardState {
                 .exec_env_states
                 .iter()
                 .map(|x| {
-                    let state = x.from_hex().unwrap();
+                    let state = x.from_hex().expect("invalid hex data");
                     assert!(state.len() == 32);
                     let mut ret = Bytes32::default();
                     ret.bytes.copy_from_slice(&state[..]);
@@ -339,7 +343,8 @@ impl From<TestShardState> for ShardState {
 fn process_yaml_test(filename: &str) {
     println!("Process yaml!");
     let content = load_file(&filename);
-    let test_file: TestFile = serde_yaml::from_slice::<TestFile>(&content[..]).unwrap();
+    let test_file: TestFile =
+        serde_yaml::from_slice::<TestFile>(&content[..]).expect("expected valid yaml");
     println!("{:#?}", test_file);
 
     let beacon_state: BeaconState = test_file.beacon_state.into();
