@@ -1,6 +1,6 @@
-//! Verifies proof and modifies state root.
+//! Verifies proof and modifies state root based on public inputs.
 //! Used the https://github.com/ebfull/bellman-demo example
-//! to generate proof for a dummy circuit (_a * b = c)
+//! to generate proof for a dummy circuit (_a * b = c).
 
 extern crate ewasm_api;
 extern crate ssz;
@@ -13,6 +13,7 @@ use ewasm_api::*;
 use pairing_ce::bn256::{Bn256, Fr};
 use pairing_ce::ff::PrimeField;
 use ssz::Decode;
+use std::convert::TryInto;
 
 extern "C" {
     fn debug_startTimer();
@@ -69,6 +70,8 @@ struct InputBlock {
 fn process_block(pre_state_root: types::Bytes32, mut block_data: &[u8]) -> types::Bytes32 {
     let block = InputBlock::decode(&mut block_data).expect("valid input");
 
+    assert!(pre_state_root.bytes[31] == TryInto::<u8>::try_into(block.public_inputs[0]).unwrap());
+
     let proof = Proof::read(&block.proof[..]).unwrap();
 
     // Prepare verifying key
@@ -89,7 +92,7 @@ fn process_block(pre_state_root: types::Bytes32, mut block_data: &[u8]) -> types
     let mut post_state_root = pre_state_root;
     // If proof is valid, mark last byte of post state root
     if verify_proof(&pvk, &proof, &public_inputs).unwrap() {
-        post_state_root.bytes[31] = 1;
+        post_state_root.bytes[31] = TryInto::<u8>::try_into(block.public_inputs[1]).unwrap();
     }
 
     unsafe {
