@@ -10,6 +10,11 @@ use ewasm_api::*;
 use pairing_ce::bn256::{Bn256, Fr};
 use pairing_ce::ff::PrimeField;
 
+extern "C" {
+    fn debug_startTimer();
+    fn debug_endTimer();
+}
+
 const VERIFYING_KEY: [u8; 772] = [
     42, 33, 239, 204, 227, 131, 165, 97, 197, 144, 23, 191, 105, 95, 71, 191, 12, 201, 89, 216, 11,
     0, 12, 64, 71, 68, 81, 184, 84, 220, 175, 254, 0, 149, 163, 139, 214, 68, 58, 0, 0, 129, 103,
@@ -71,12 +76,18 @@ pub extern "C" fn main() {
 
     // Block data only contains serialized proof
     let block_data = eth2::acquire_block_data();
+
     //let serialized_proof = block_data;
     let proof = Proof::read(serialized_proof.as_slice()).unwrap();
 
     // Prepare verifying key
     let pk = VerifyingKey::<Bn256>::read(VERIFYING_KEY.as_ref()).unwrap();
     let pvk = prepare_verifying_key(&pk);
+
+    // Start benchmarking timer
+    unsafe {
+        debug_startTimer();
+    }
 
     // If proof is valid, mark last byte of post state root
     if verify_proof(
@@ -87,6 +98,10 @@ pub extern "C" fn main() {
     .unwrap()
     {
         post_state_root.bytes[31] = 1;
+    }
+
+    unsafe {
+        debug_endTimer();
     }
 
     eth2::save_post_state_root(post_state_root)
