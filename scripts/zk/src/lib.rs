@@ -2,13 +2,17 @@
 //! Used the https://github.com/ebfull/bellman-demo example
 //! to generate proof for a dummy circuit (_a * b = c)
 
-extern crate bellman_ce;
 extern crate ewasm_api;
+extern crate ssz;
+#[macro_use]
+extern crate ssz_derive;
+extern crate bellman_ce;
 extern crate pairing_ce;
 use bellman_ce::groth16::{prepare_verifying_key, verify_proof, Proof, VerifyingKey};
 use ewasm_api::*;
 use pairing_ce::bn256::{Bn256, Fr};
 use pairing_ce::ff::PrimeField;
+use ssz::Decode;
 
 extern "C" {
     fn debug_startTimer();
@@ -56,29 +60,26 @@ const VERIFYING_KEY: [u8; 772] = [
     222, 143, 86, 110, 197, 245, 163, 235,
 ];
 
+#[derive(Ssz)]
+struct InputBlock {
+    pub proof: [u8; 128],
+    pub public_inputs: [u64; 2],
+}
+
 #[cfg(not(test))]
 #[no_mangle]
 pub extern "C" fn main() {
     let pre_state_root = eth2::load_pre_state_root();
     let mut post_state_root = pre_state_root;
 
-    let serialized_proof = vec![
-        172, 2, 162, 201, 157, 209, 71, 92, 22, 54, 179, 104, 208, 244, 81, 44, 247, 131, 1, 61,
-        39, 111, 5, 90, 30, 142, 36, 20, 189, 209, 158, 228, 44, 54, 4, 214, 108, 49, 23, 212, 195,
-        173, 63, 100, 68, 229, 19, 134, 140, 185, 215, 221, 59, 105, 236, 54, 183, 213, 133, 207,
-        207, 176, 241, 185, 40, 205, 25, 206, 71, 110, 21, 43, 29, 8, 29, 227, 82, 166, 98, 121,
-        32, 210, 61, 254, 28, 1, 102, 242, 248, 201, 237, 179, 103, 160, 23, 159, 21, 76, 163, 3,
-        248, 118, 191, 23, 120, 113, 112, 193, 90, 71, 42, 180, 69, 56, 84, 204, 115, 9, 64, 6,
-        190, 61, 34, 22, 45, 92, 11, 84,
-    ];
-
     assert!(eth2::block_data_size() > 0);
 
     // Block data only contains serialized proof
     let block_data = eth2::acquire_block_data();
+    let block = InputBlock::decode(&mut block_data.as_slice()).expect("valid input");
 
     //let serialized_proof = block_data;
-    let proof = Proof::read(serialized_proof.as_slice()).unwrap();
+    let proof = Proof::read(&block.proof[..]).unwrap();
 
     // Prepare verifying key
     let pk = VerifyingKey::<Bn256>::read(VERIFYING_KEY.as_ref()).unwrap();
@@ -93,7 +94,10 @@ pub extern "C" fn main() {
     if verify_proof(
         &pvk,
         &proof,
-        &[Fr::from_str("4").unwrap(), Fr::from_str("12").unwrap()],
+        &[
+            Fr::from_str(block.public_inputs[0].to_string().as_str()).unwrap(),
+            Fr::from_str(block.public_inputs[1].to_string().as_str()).unwrap(),
+        ],
     )
     .unwrap()
     {
