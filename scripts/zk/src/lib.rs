@@ -66,47 +66,47 @@ struct InputBlock {
     pub public_inputs: [u64; 2],
 }
 
-#[cfg(not(test))]
-#[no_mangle]
-pub extern "C" fn main() {
-    let pre_state_root = eth2::load_pre_state_root();
-    let mut post_state_root = pre_state_root;
+fn process_block(pre_state_root: types::Bytes32, mut block_data: &[u8]) -> types::Bytes32 {
+    let block = InputBlock::decode(&mut block_data).expect("valid input");
 
-    assert!(eth2::block_data_size() > 0);
-
-    // Block data only contains serialized proof
-    let block_data = eth2::acquire_block_data();
-    let block = InputBlock::decode(&mut block_data.as_slice()).expect("valid input");
-
-    //let serialized_proof = block_data;
     let proof = Proof::read(&block.proof[..]).unwrap();
 
     // Prepare verifying key
     let pk = VerifyingKey::<Bn256>::read(VERIFYING_KEY.as_ref()).unwrap();
     let pvk = prepare_verifying_key(&pk);
 
+    // Prepare public inputs
+    let public_inputs = [
+        Fr::from_str(block.public_inputs[0].to_string().as_str()).unwrap(),
+        Fr::from_str(block.public_inputs[1].to_string().as_str()).unwrap(),
+    ];
+
     // Start benchmarking timer
     unsafe {
         debug_startTimer();
     }
 
+    let mut post_state_root = pre_state_root;
     // If proof is valid, mark last byte of post state root
-    if verify_proof(
-        &pvk,
-        &proof,
-        &[
-            Fr::from_str(block.public_inputs[0].to_string().as_str()).unwrap(),
-            Fr::from_str(block.public_inputs[1].to_string().as_str()).unwrap(),
-        ],
-    )
-    .unwrap()
-    {
+    if verify_proof(&pvk, &proof, &public_inputs).unwrap() {
         post_state_root.bytes[31] = 1;
     }
 
     unsafe {
         debug_endTimer();
     }
+
+    post_state_root
+}
+
+#[cfg(not(test))]
+#[no_mangle]
+pub extern "C" fn main() {
+    assert!(eth2::block_data_size() > 0);
+
+    let pre_state_root = eth2::load_pre_state_root();
+    let block_data = eth2::acquire_block_data();
+    let post_state_root = process_block(pre_state_root, &block_data);
 
     eth2::save_post_state_root(post_state_root)
 }
