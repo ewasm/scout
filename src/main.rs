@@ -100,7 +100,7 @@ struct Runtime<'a> {
     code: &'a [u8],
     libraries: &'a Vec<Library>,
     ticks_left: u32,
-    memory: Option<MemoryRef>,
+    pub memory: Option<MemoryRef>,
     pre_state: &'a Bytes32,
     block_data: &'a ShardBlockBody,
     post_state: Bytes32,
