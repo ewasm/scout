@@ -9,7 +9,7 @@ use wasmi::memory_units::Pages;
 use wasmi::{
     Error as InterpreterError, Externals, FuncInstance, FuncRef, ImportsBuilder, MemoryInstance,
     MemoryRef, Module, ModuleImportResolver, ModuleInstance, NopExternals, RuntimeArgs,
-    RuntimeValue, Signature, Trap, ValueType,
+    RuntimeValue, Signature, Trap, TrapKind, ValueType,
 };
 
 mod types;
@@ -20,8 +20,10 @@ const BLOCKDATASIZE_FUNC_INDEX: usize = 1;
 const BLOCKDATACOPY_FUNC_INDEX: usize = 2;
 const SAVEPOSTSTATEROOT_FUNC_INDEX: usize = 3;
 const PUSHNEWDEPOSIT_FUNC_INDEX: usize = 4;
+const USETICKS_FUNC_INDEX: usize = 5;
 
 struct Runtime<'a> {
+    ticks_left: u32,
     memory: Option<MemoryRef>,
     pre_state: &'a Bytes32,
     block_data: &'a ShardBlockBody,
@@ -35,6 +37,7 @@ impl<'a> Runtime<'a> {
         memory: Option<MemoryRef>,
     ) -> Runtime<'a> {
         Runtime {
+            ticks_left: 10_000_000, // FIXME: make this configurable
             memory: if memory.is_some() {
                 memory
             } else {
@@ -59,6 +62,15 @@ impl<'a> Externals for Runtime<'a> {
         args: RuntimeArgs,
     ) -> Result<Option<RuntimeValue>, Trap> {
         match index {
+            USETICKS_FUNC_INDEX => {
+                let ticks: u32 = args.nth(0);
+                if self.ticks_left < ticks {
+                    // FIXME: use TrapKind::Host
+                    return Err(Trap::new(TrapKind::Unreachable));
+                }
+                self.ticks_left -= ticks;
+                Ok(None)
+            }
             LOADPRESTATEROOT_FUNC_INDEX => {
                 let ptr: u32 = args.nth(0);
                 println!("loadprestateroot to {}", ptr);
@@ -124,6 +136,10 @@ impl<'a> ModuleImportResolver for RuntimeModuleImportResolver {
         _signature: &Signature,
     ) -> Result<FuncRef, InterpreterError> {
         let func_ref = match field_name {
+            "eth2_useTicks" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32][..], None),
+                USETICKS_FUNC_INDEX,
+            ),
             "eth2_loadPreStateRoot" => FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32][..], None),
                 LOADPRESTATEROOT_FUNC_INDEX,
