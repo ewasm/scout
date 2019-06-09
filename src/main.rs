@@ -100,7 +100,7 @@ struct Runtime<'a> {
     code: &'a [u8],
     libraries: &'a Vec<Library>,
     ticks_left: u32,
-    pub memory: Option<MemoryRef>,
+    memory: Option<MemoryRef>,
     pre_state: &'a Bytes32,
     block_data: &'a ShardBlockBody,
     post_state: Bytes32,
@@ -928,16 +928,28 @@ fn process_yaml_test(filename: &str) -> Result<(), ScoutError> {
     Ok(())
 }
 
-fn main() {
-    env_logger::init();
+#[macro_use]
+extern crate criterion;
 
-    let args: Vec<String> = env::args().collect();
-    let ret = process_yaml_test(if args.len() != 2 {
-        "test.yaml"
-    } else {
-        &args[1]
+use criterion::black_box;
+use criterion::Criterion;
+
+fn criterion_benchmark(c: &mut Criterion) {
+    env_logger::init();
+    c.bench_function("test", |b| {
+        b.iter(|| {
+            let args: Vec<String> = env::args().collect();
+            let ret = process_yaml_test(if args.len() != 2 {
+                "test.yaml"
+            } else {
+                &args[1]
+            });
+            if ret.is_err() {
+                println!("Unexpected test failure: {:?}", ret.err().unwrap())
+            }
+        })
     });
-    if ret.is_err() {
-        println!("Unexpected test failure: {:?}", ret.err().unwrap())
-    }
 }
+
+criterion_group!(benches, criterion_benchmark);
+criterion_main!(benches);
