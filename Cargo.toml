@@ -18,3 +18,8 @@ env_logger = "0.7"
 primitive-types = "0.6"
 ssz = "0.1.2"
 ssz-derive = "0.1.2"
+criterion = "0.2"
+
+[[bench]]
+name = "scout_bench"
+harness = false
