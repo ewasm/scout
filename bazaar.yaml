@@ -5,15 +5,30 @@ beacon_state:
 shard_pre_state:
   exec_env_states:
     - "0000000000000000000000000000000000000000000000000000000000000000"
-    - "22ea9b045f8792170b45ec629c98e1b92bc6a19cd8d0e9f37baaadf2564142f4"
+    - messages:
+      - "list"
 shard_blocks:
   - env: 0
     data: ""
   - env: 0
     data: ""
   - env: 1
-    data: "5c0000005000000001000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000001010101010101010101010101010101010101010101010101010101010101010400000000000000"
+    data:
+      new_messages:
+        - list
+        - timestamp: 1:u64
+          message: 0:u256
+        - timestamp: 2:u64
+          message: 123:u256
+      state:
+        messages:
+          - list
 shard_post_state:
   exec_env_states:
     - "0000000000000000000000000000000000000000000000000000000000000000"
-    - "29505fd952857b5766c759bcb4af58eb8df5a91043540c1398dd987a503127fc"
+    - messsages:
+      - list
+      - timestamp: 1:u64
+        message: 0:u256
+      - timestamp: 2:u64
+        message: 123:u256

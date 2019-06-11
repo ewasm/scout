@@ -3,6 +3,8 @@ extern crate wasmi;
 
 use rustc_hex::FromHex;
 use serde::{Deserialize, Serialize};
+use sha3::{Digest, Keccak256};
+use sszt::yaml::to_ssz;
 use std::env;
 use std::fs::File;
 use wasmi::memory_units::Pages;
@@ -270,6 +272,22 @@ fn load_file(filename: &str) -> Vec<u8> {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+enum TestDataValue {
+    Ssz(String),
+    Object(serde_yaml::Value),
+}
+
+impl TestDataValue {
+    fn to_bytes(&self) -> Vec<u8> {
+        match self {
+            TestDataValue::Ssz(s) => s.from_hex().unwrap(),
+            TestDataValue::Object(o) => to_ssz(serde_yaml::to_vec(&o).unwrap()),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct TestBeaconState {
     execution_scripts: Vec<String>,
 }
@@ -277,12 +295,12 @@ struct TestBeaconState {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct TestShardBlock {
     env: u64,
-    data: String,
+    data: TestDataValue,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct TestShardState {
-    exec_env_states: Vec<String>,
+    exec_env_states: Vec<TestDataValue>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -310,7 +328,7 @@ impl From<TestShardBlock> for ShardBlock {
         ShardBlock {
             env: input.env,
             data: ShardBlockBody {
-                data: input.data.from_hex().unwrap(),
+                data: input.data.to_bytes(),
             },
         }
     }
@@ -323,10 +341,10 @@ impl From<TestShardState> for ShardState {
                 .exec_env_states
                 .iter()
                 .map(|x| {
-                    let state = x.from_hex().unwrap();
-                    assert!(state.len() == 32);
+                    let hash = Keccak256::digest(&x.to_bytes()[..]);
+                    assert!(hash.len() == 32);
                     let mut ret = Bytes32::default();
-                    ret.bytes.copy_from_slice(&state[..]);
+                    ret.bytes.copy_from_slice(&hash[..]);
                     ret
                 })
                 .collect(),
