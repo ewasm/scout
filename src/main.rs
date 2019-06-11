@@ -12,8 +12,8 @@ use std::rc::Rc;
 use wasmi::memory_units::Pages;
 use wasmi::{
     Error as InterpreterError, Externals, FuncInstance, FuncRef, ImportsBuilder, MemoryInstance,
-    MemoryRef, Module, ModuleImportResolver, ModuleInstance, NopExternals, RuntimeArgs,
-    RuntimeValue, Signature, Trap, ValueType,
+    MemoryRef, Module, ModuleImportResolver, ModuleInstance, RuntimeArgs, RuntimeValue, Signature,
+    Trap, ValueType,
 };
 
 mod types;
@@ -376,12 +376,6 @@ pub fn execute_code(
     block_data: &ShardBlockBody,
     context: Context,
 ) -> (Bytes32, Vec<Deposit>, Vec<u8>) {
-    // println!(
-    //     "Executing codesize({}) and data: {:#?}",
-    //     code.len(),
-    //     block_data
-    // );
-
     let module = Module::from_buffer(&code).unwrap();
     let mut imports = ImportsBuilder::new();
     // FIXME: use eth2
@@ -421,11 +415,6 @@ pub fn process_shard_block(
     beacon_state: &BeaconState,
     block: Option<ShardBlock>,
 ) {
-    // println!("Beacon state: {:#?}", beacon_state);
-    // println!("Executing block: {:#?}", block);
-
-    // println!("Pre-execution: {:#?}", state);
-
     // TODO: implement state root handling
 
     if let Some(block) = block {

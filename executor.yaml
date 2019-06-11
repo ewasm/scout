@@ -10,5 +10,3 @@ shard_blocks:
 shard_post_state:
   exec_env_states:
     - "c4ba69b75b6f8d0a447bc3f78c64f01b75e2882391d817e5505d4a059ea19542"
-
-

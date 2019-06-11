@@ -8,4 +8,6 @@ build:
 	cargo build --release
 
 test:
+	target/release/phase2-scout
+	target/release/phase2-scout bazaar.yaml
 	target/release/phase2-scout executor.yaml
