@@ -341,7 +341,10 @@ impl From<TestShardState> for ShardState {
                 .exec_env_states
                 .iter()
                 .map(|x| {
-                    let hash = Keccak256::digest(&x.to_bytes()[..]);
+                    let hash: Vec<u8> = match x {
+                        TestDataValue::Ssz(_) => x.to_bytes(),
+                        TestDataValue::Object(_) => Keccak256::digest(&x.to_bytes()[..])[..].into(),
+                    };
                     assert!(hash.len() == 32);
                     let mut ret = Bytes32::default();
                     ret.bytes.copy_from_slice(&hash[..]);
