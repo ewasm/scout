@@ -22,16 +22,25 @@ const SAVEPOSTSTATEROOT_FUNC_INDEX: usize = 3;
 const PUSHNEWDEPOSIT_FUNC_INDEX: usize = 4;
 
 struct Runtime<'a> {
-    pub memory: Option<MemoryRef>,
+    memory: Option<MemoryRef>,
     pre_state: &'a Bytes32,
     block_data: &'a ShardBlockBody,
     post_state: Bytes32,
 }
 
 impl<'a> Runtime<'a> {
-    fn new(pre_state: &'a Bytes32, block_data: &'a ShardBlockBody) -> Runtime<'a> {
+    fn new(
+        pre_state: &'a Bytes32,
+        block_data: &'a ShardBlockBody,
+        memory: Option<MemoryRef>,
+    ) -> Runtime<'a> {
         Runtime {
-            memory: Some(MemoryInstance::alloc(Pages(1), Some(Pages(1))).unwrap()),
+            memory: if memory.is_some() {
+                memory
+            } else {
+                // Allocate a single page if no memory was exported.
+                Some(MemoryInstance::alloc(Pages(1), Some(Pages(1))).unwrap())
+            },
             pre_state: pre_state,
             block_data: block_data,
             post_state: Bytes32::default(),
@@ -213,8 +222,6 @@ pub fn execute_code(
         .expect("Module instantation expected to succeed")
         .assert_no_start();
 
-    let mut runtime = Runtime::new(pre_state, block_data);
-
     let internal_mem = instance
         .export_by_name("memory")
         .expect("Module expected to have 'memory' export")
@@ -222,7 +229,7 @@ pub fn execute_code(
         .cloned()
         .expect("'memory' export should be a memory");
 
-    runtime.memory = Some(internal_mem);
+    let mut runtime = Runtime::new(pre_state, block_data, Some(internal_mem));
 
     let result = instance
         .invoke_export("main", &[], &mut runtime)
