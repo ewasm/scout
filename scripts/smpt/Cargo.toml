@@ -1,0 +1,37 @@
+[package]
+name = "smpt"
+version = "0.0.0"
+license = "Apache-2.0"
+repository = "https://github.com/ewasm/scout"
+description = "Stateless merkle patricia balance tree"
+publish = false
+edition = "2018"
+
+[dependencies]
+patricia-trie-ethereum = "0.1.0"
+hash-db = "0.12.4"
+trie-db = "0.12.4"
+keccak-hasher = "0.12.4"
+kvdb = "0.1"
+memory-db = "0.12.4"
+rlp = "0.4.0"
+elastic-array = "0.10"
+ethereum-types = "0.6.0"
+tiny-keccak = "1.4.2"
+plain_hasher = "0.2"
+libsecp256k1 = "0.2.2"
+#eth-secp256k1 = { git = "https://github.com/paritytech/rust-secp256k1" }
+#ethkey = "0.2.5"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies.ewasm_api]
+git = "https://github.com/ewasm/ewasm-rust-api"
+rev = "1c01982"
+default-features = false
+features = ["std", "eth2", "qimalloc"]
+
+[profile.release]
+lto = true
+debug = false
