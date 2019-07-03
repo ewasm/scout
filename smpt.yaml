@@ -1,6 +1,6 @@
 beacon_state:
   execution_scripts:
-    - target/wasm32-unknown-unknown/release/smpt.wasm
+    - scripts/smpt/target/wasm32-unknown-unknown/release/smpt.wasm
 shard_pre_state:
   exec_env_states:
     - 592a4e79de4ef293851b367ab6b0333ad07c3b9dae40e040f8010c4cd5aedfa9
