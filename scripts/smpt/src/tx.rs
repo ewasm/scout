@@ -3,6 +3,27 @@ use ethereum_types::{Address, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatefulTx {
+    pub tx: Tx,
+    pub from_witness: Vec<Vec<u8>>,
+    pub to_witness: Vec<Vec<u8>>,
+}
+
+impl Decodable for StatefulTx {
+    fn decode(d: &Rlp) -> Result<Self, DecoderError> {
+        if d.item_count()? != 3 {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+
+        Ok(StatefulTx {
+            tx: d.val_at(0)?,
+            from_witness: d.list_at(1)?,
+            to_witness: d.list_at(2)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tx {
     pub to: Address,
     pub value: U256,

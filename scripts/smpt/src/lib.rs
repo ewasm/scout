@@ -23,90 +23,88 @@ use rlp::{DecoderError, Rlp};
 use rlp_node_codec::RlpNodeCodec;
 use sig::recover_address;
 use tiny_keccak::keccak256;
-use trie::{Trie, TrieMut};
-use tx::{Tx, UnsignedTx};
+use trie::TrieMut;
+use tx::{StatefulTx, UnsignedTx};
 
 type RlpCodec = RlpNodeCodec<KeccakHasher>;
-type SecTrieDB<'db> = trie::SecTrieDB<'db, KeccakHasher, RlpCodec>;
 type SecTrieDBMut<'db> = trie::SecTrieDBMut<'db, KeccakHasher, RlpCodec>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct BlockData {
-    tx: Tx,
-    from_witness: Vec<Vec<u8>>,
-    to_witness: Vec<Vec<u8>>,
+    txes: Vec<StatefulTx>,
 }
 
 impl rlp::Decodable for BlockData {
     fn decode(d: &Rlp) -> Result<Self, DecoderError> {
-        if d.item_count()? != 3 {
+        if d.item_count()? != 1 {
             return Err(DecoderError::RlpIncorrectListLen);
         }
 
         Ok(BlockData {
-            tx: d.val_at(0)?,
-            from_witness: d.list_at(1)?,
-            to_witness: d.list_at(2)?,
+            txes: d.list_at(0)?,
         })
     }
 }
 
 fn process_block(pre_state_root: types::Bytes32, block_data_bytes: &[u8]) -> types::Bytes32 {
-    let block_data: BlockData = rlp::decode(&block_data_bytes).unwrap();
-    let tx = block_data.tx;
+    let stateful_txes: Vec<StatefulTx> = rlp::decode_list(&block_data_bytes);
 
-    // Recover sender from signature
-    let tx_rlp = rlp::encode(&UnsignedTx {
-        to: tx.to,
-        value: tx.value,
-        nonce: tx.nonce,
-    });
-    let tx_hash = keccak256(&tx_rlp);
-    let from_address = recover_address(&tx.sig, tx_hash);
-
-    // Insert witnesses to trie's underlying db
-    // and construct trie from witnesses
+    // Construct trie from merkle proofs
     let mut db = MemoryDB::<KeccakHasher, HashKey<_>, DBValue>::from_null_node(
         &rlp::NULL_RLP,
         rlp::NULL_RLP.as_ref().into(),
     );
-    for item in block_data.from_witness {
-        db.insert(EMPTY_PREFIX, item.as_slice());
+    for tx in stateful_txes.clone() {
+        // Insert proof values to trie's underlying db
+        for item in tx.from_witness {
+            db.insert(EMPTY_PREFIX, item.as_slice());
+        }
+        for item in tx.to_witness {
+            db.insert(EMPTY_PREFIX, item.as_slice());
+        }
     }
-    for item in block_data.to_witness {
-        db.insert(EMPTY_PREFIX, item.as_slice());
-    }
+
     let mut root = H256::from_slice(&pre_state_root.bytes[..]);
-    let t = SecTrieDB::new(&db, &root).unwrap();
+    let mut trie = SecTrieDBMut::from_existing(&mut db, &mut root).unwrap();
 
-    // Make sure trie contains `from` and `to`
-    assert!(t.contains(from_address.as_bytes()).unwrap());
-    assert!(t.contains(tx.to.as_bytes()).unwrap());
+    for stateful_tx in stateful_txes {
+        let tx = stateful_tx.tx;
+        // Recover sender from signature
+        let tx_rlp = rlp::encode(&UnsignedTx {
+            to: tx.to,
+            value: tx.value,
+            nonce: tx.nonce,
+        });
+        let tx_hash = keccak256(&tx_rlp);
+        let from_address = recover_address(&tx.sig, tx_hash);
 
-    // Fetch `from` and `to` accounts from trie
-    let from_account_bytes = t.get(from_address.as_bytes()).unwrap().unwrap();
-    let mut from_account = rlp::decode::<BasicAccount>(&from_account_bytes).unwrap();
-    let to_account_bytes = t.get(tx.to.as_bytes()).unwrap().unwrap();
-    let mut to_account = rlp::decode::<BasicAccount>(&to_account_bytes).unwrap();
+        // Make sure trie contains `from` and `to`
+        assert!(trie.contains(from_address.as_bytes()).unwrap());
+        assert!(trie.contains(tx.to.as_bytes()).unwrap());
 
-    // Pre transfer checks
-    assert!(from_account.nonce == tx.nonce);
-    assert!(from_account.balance >= tx.value);
+        // Fetch `from` and `to` accounts from trie
+        let from_account_bytes = trie.get(from_address.as_bytes()).unwrap().unwrap();
+        let mut from_account = rlp::decode::<BasicAccount>(&from_account_bytes).unwrap();
+        let to_account_bytes = trie.get(tx.to.as_bytes()).unwrap().unwrap();
+        let mut to_account = rlp::decode::<BasicAccount>(&to_account_bytes).unwrap();
 
-    // Increment sender's nonce and update balances
-    from_account.nonce += U256::from(1);
-    from_account.balance -= tx.value;
-    to_account.balance += tx.value;
+        // Pre transfer checks
+        assert!(from_account.nonce == tx.nonce);
+        assert!(from_account.balance >= tx.value);
 
-    // Update trie with new balances and nonces
-    let mut mt = SecTrieDBMut::from_existing(&mut db, &mut root).unwrap();
-    let from_encoded = rlp::encode(&from_account);
-    let to_encoded = rlp::encode(&to_account);
-    mt.insert(from_address.as_bytes(), &from_encoded).unwrap();
-    mt.insert(tx.to.as_bytes(), &to_encoded).unwrap();
-    let post_root = mt.root();
+        // Increment sender's nonce and update balances
+        from_account.nonce += U256::from(1);
+        from_account.balance -= tx.value;
+        to_account.balance += tx.value;
 
-    types::Bytes32::from(post_root.as_fixed_bytes())
+        // Update trie with new balances and nonces
+        let from_encoded = rlp::encode(&from_account);
+        let to_encoded = rlp::encode(&to_account);
+        trie.insert(from_address.as_bytes(), &from_encoded).unwrap();
+        trie.insert(tx.to.as_bytes(), &to_encoded).unwrap();
+    }
+
+    types::Bytes32::from(trie.root().as_fixed_bytes())
 }
 
 #[cfg(not(test))]
