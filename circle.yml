@@ -9,11 +9,11 @@ jobs:
       - run:
           name: Install dependencies
           command: |
-            apt-add-repository "deb http://apt.llvm.org/stretch/ llvm-toolchain-stretch-8 main"
-            apt-add-repository "deb-src http://apt.llvm.org/stretch/ llvm-toolchain-stretch-8 main"
-            wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
+            echo "deb http://apt.llvm.org/stretch/ llvm-toolchain-stretch main" >> /etc/apt/sources.list
+            echo "deb-src http://apt.llvm.org/stretch/ llvm-toolchain-stretch main" >> /etc/apt/sources.list
+            wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
             apt-get update
-            apt-get install clang-8 lldb-8 lld-8
+            apt-get install -y clang lldb lld
       - run:
           name: Update environment
           command: |
