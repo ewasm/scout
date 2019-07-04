@@ -1,0 +1,8 @@
+snark_verifier:
+  file: "target/wasm32-unknown-unknown/release/snark_verifier.wasm"
+  trimexports:
+    preset: "ewasm"
+  verifyexports:
+    preset: "ewasm"
+  repack:
+    preset: "ewasm"

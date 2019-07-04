@@ -5,6 +5,7 @@ use rustc_hex::FromHex;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs::File;
+use std::time::Instant;
 use wasmi::memory_units::Pages;
 use wasmi::{
     Error as InterpreterError, Externals, FuncInstance, FuncRef, ImportsBuilder, MemoryInstance,
@@ -20,12 +21,15 @@ const BLOCKDATASIZE_FUNC_INDEX: usize = 1;
 const BLOCKDATACOPY_FUNC_INDEX: usize = 2;
 const SAVEPOSTSTATEROOT_FUNC_INDEX: usize = 3;
 const PUSHNEWDEPOSIT_FUNC_INDEX: usize = 4;
+const STARTTIMER_FUNC_INDEX: usize = 5;
+const ENDTIMER_FUNC_INDEX: usize = 6;
 
 struct Runtime<'a> {
     memory: Option<MemoryRef>,
     pre_state: &'a Bytes32,
     block_data: &'a ShardBlockBody,
     post_state: Bytes32,
+    timer_start: Instant,
 }
 
 impl<'a> Runtime<'a> {
@@ -44,6 +48,7 @@ impl<'a> Runtime<'a> {
             pre_state: pre_state,
             block_data: block_data,
             post_state: Bytes32::default(),
+            timer_start: Instant::now(),
         }
     }
 
@@ -110,6 +115,17 @@ impl<'a> Externals for Runtime<'a> {
                 Ok(None)
             }
             PUSHNEWDEPOSIT_FUNC_INDEX => unimplemented!(),
+            STARTTIMER_FUNC_INDEX => {
+                self.timer_start = Instant::now();
+                Ok(None)
+            }
+            ENDTIMER_FUNC_INDEX => {
+                println!(
+                    "End timer, duration is: {} ms",
+                    self.timer_start.elapsed().as_millis()
+                );
+                Ok(None)
+            }
             _ => panic!("unknown function index"),
         }
     }
@@ -144,6 +160,12 @@ impl<'a> ModuleImportResolver for RuntimeModuleImportResolver {
                 Signature::new(&[ValueType::I32][..], None),
                 PUSHNEWDEPOSIT_FUNC_INDEX,
             ),
+            "debug_startTimer" => {
+                FuncInstance::alloc_host(Signature::new(&[][..], None), STARTTIMER_FUNC_INDEX)
+            }
+            "debug_endTimer" => {
+                FuncInstance::alloc_host(Signature::new(&[][..], None), ENDTIMER_FUNC_INDEX)
+            }
             _ => {
                 return Err(InterpreterError::Function(format!(
                     "host module doesn't export function with name {}",
@@ -231,12 +253,13 @@ pub fn execute_code(
 
     let mut runtime = Runtime::new(pre_state, block_data, Some(internal_mem));
 
+    let now = Instant::now();
     let result = instance
         .invoke_export("main", &[], &mut runtime)
         .expect("Executed 'main'");
 
     println!("Result: {:?}", result);
-    println!("Execution finished");
+    println!("Execution finished in {} ms", now.elapsed().as_millis());
 
     (runtime.get_post_state(), vec![Deposit {}])
 }

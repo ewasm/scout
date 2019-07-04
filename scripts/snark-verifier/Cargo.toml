@@ -1,0 +1,26 @@
+[package]
+name = "snark-verifier"
+version = "0.0.0"
+license = "Apache-2.0"
+repository = "https://github.com/ewasm/scout"
+description = "Eth 2.0 Phase 2 execution script: Simple SNARK verifier"
+publish = false
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+bellman_ce = "0.3"
+pairing_ce = "0.17"
+ssz = "0.1.2"
+ssz-derive = "0.1.2"
+
+[dependencies.ewasm_api]
+version = "0.10.0"
+default-features = false
+features = ["std", "eth2", "wee_alloc"]
+
+[profile.release]
+lto = true
+debug = false
