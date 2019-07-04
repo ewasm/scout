@@ -15,7 +15,7 @@ mod tx;
 use crate::keccak_hasher::KeccakHasher;
 use account::BasicAccount;
 use ethereum_types::{H256, U256};
-use ewasm_api::*;
+use ewasm_api::prelude::*;
 use hash_db::{HashDB, EMPTY_PREFIX};
 use kvdb::DBValue;
 use memory_db::*;
@@ -46,7 +46,7 @@ impl rlp::Decodable for BlockData {
     }
 }
 
-fn process_block(pre_state_root: types::Bytes32, block_data_bytes: &[u8]) -> types::Bytes32 {
+fn process_block(pre_state_root: Bytes32, block_data_bytes: &[u8]) -> Bytes32 {
     let stateful_txes: Vec<StatefulTx> = rlp::decode_list(&block_data_bytes);
 
     // Construct trie from merkle proofs
@@ -104,7 +104,7 @@ fn process_block(pre_state_root: types::Bytes32, block_data_bytes: &[u8]) -> typ
         trie.insert(tx.to.as_bytes(), &to_encoded).unwrap();
     }
 
-    types::Bytes32::from(trie.root().as_fixed_bytes())
+    Bytes32::from(trie.root().as_fixed_bytes())
 }
 
 #[cfg(not(test))]
@@ -113,5 +113,5 @@ pub extern "C" fn main() {
     let pre_state_root = eth2::load_pre_state_root();
     let block_data = eth2::acquire_block_data();
     let post_state_root = process_block(pre_state_root, &block_data);
-    eth2::save_post_state_root(post_state_root)
+    eth2::save_post_state_root(&post_state_root)
 }
