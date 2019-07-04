@@ -1,5 +1,5 @@
-zk:
-  file: "target/wasm32-unknown-unknown/release/phase2_zk.wasm"
+snark_verifier:
+  file: "target/wasm32-unknown-unknown/release/snark_verifier.wasm"
   trimexports:
     preset: "ewasm"
   verifyexports:

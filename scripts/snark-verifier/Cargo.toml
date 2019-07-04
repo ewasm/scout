@@ -1,9 +1,9 @@
 [package]
-name = "phase2-zk"
+name = "snark-verifier"
 version = "0.0.0"
 license = "Apache-2.0"
 repository = "https://github.com/ewasm/scout"
-description = "Eth 2.0 Phase 2 execution script: zk"
+description = "Eth 2.0 Phase 2 execution script: Simple SNARK verifier"
 publish = false
 edition = "2018"
 

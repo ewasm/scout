@@ -1,6 +1,6 @@
 beacon_state:
   execution_scripts:
-    - scripts/zk/target/wasm32-unknown-unknown/release/phase2_zk.wasm
+    - scripts/snark-verifier/target/wasm32-unknown-unknown/release/snark_verifier.wasm
 shard_pre_state:
   exec_env_states:
     - "0000000000000000000000000000000000000000000000000000000000000004"
