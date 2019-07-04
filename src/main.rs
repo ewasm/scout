@@ -5,7 +5,7 @@ use rustc_hex::FromHex;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs::File;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use wasmi::memory_units::Pages;
 use wasmi::{
     Error as InterpreterError, Externals, FuncInstance, FuncRef, ImportsBuilder, MemoryInstance,
