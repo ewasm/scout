@@ -17,8 +17,7 @@ ssz = "0.1.2"
 ssz-derive = "0.1.2"
 
 [dependencies.ewasm_api]
-git = "https://github.com/ewasm/ewasm-rust-api"
-rev = "1c01982"
+version = "0.10.0"
 default-features = false
 features = ["std", "eth2", "wee_alloc"]
 

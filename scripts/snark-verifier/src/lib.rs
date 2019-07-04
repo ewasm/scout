@@ -111,5 +111,5 @@ pub extern "C" fn main() {
     let block_data = eth2::acquire_block_data();
     let post_state_root = process_block(pre_state_root, &block_data);
 
-    eth2::save_post_state_root(post_state_root)
+    eth2::save_post_state_root(&post_state_root)
 }
