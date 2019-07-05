@@ -27,7 +27,7 @@ crate-type = ["cdylib"]
 [dependencies.ewasm_api]
 version = "0.10.0"
 default-features = false
-features = ["std", "eth2", "qimalloc"]
+features = ["std", "eth2", "wee_alloc", "debug"]
 
 [profile.release]
 lto = true
