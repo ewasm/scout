@@ -24,51 +24,48 @@ use rlp_node_codec::RlpNodeCodec;
 use sig::recover_address;
 use tiny_keccak::keccak256;
 use trie::TrieMut;
-use tx::{StatefulTx, UnsignedTx};
+use tx::{Tx, UnsignedTx};
 
 type RlpCodec = RlpNodeCodec<KeccakHasher>;
 type SecTrieDBMut<'db> = trie::SecTrieDBMut<'db, KeccakHasher, RlpCodec>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct BlockData {
-    txes: Vec<StatefulTx>,
+    txes: Vec<Tx>,
+    proof_nodes: Vec<Vec<u8>>,
 }
 
 impl rlp::Decodable for BlockData {
     fn decode(d: &Rlp) -> Result<Self, DecoderError> {
-        if d.item_count()? != 1 {
+        if d.item_count()? != 2 {
             return Err(DecoderError::RlpIncorrectListLen);
         }
 
         Ok(BlockData {
             txes: d.list_at(0)?,
+            proof_nodes: d.list_at(1)?,
         })
     }
 }
 
 fn process_block(pre_state_root: Bytes32, block_data_bytes: &[u8]) -> Bytes32 {
-    let stateful_txes: Vec<StatefulTx> = rlp::decode_list(&block_data_bytes);
+    let block_data: BlockData = rlp::decode(&block_data_bytes).unwrap();
 
     // Construct trie from merkle proofs
     let mut db = MemoryDB::<KeccakHasher, HashKey<_>, DBValue>::from_null_node(
         &rlp::NULL_RLP,
         rlp::NULL_RLP.as_ref().into(),
     );
-    for tx in stateful_txes.clone() {
-        // Insert proof values to trie's underlying db
-        for item in tx.from_witness {
-            db.insert(EMPTY_PREFIX, item.as_slice());
-        }
-        for item in tx.to_witness {
-            db.insert(EMPTY_PREFIX, item.as_slice());
-        }
+
+    // Insert proof values to trie's underlying db
+    for item in block_data.proof_nodes {
+        db.insert(EMPTY_PREFIX, item.as_slice());
     }
 
     let mut root = H256::from_slice(&pre_state_root.bytes[..]);
     let mut trie = SecTrieDBMut::from_existing(&mut db, &mut root).unwrap();
 
-    for stateful_tx in stateful_txes {
-        let tx = stateful_tx.tx;
+    for tx in block_data.txes {
         // Recover sender from signature
         let tx_rlp = rlp::encode(&UnsignedTx {
             to: tx.to,
