@@ -18,8 +18,11 @@ Instead of being a client, it should support reading and outputting shard/beacon
 
 ## How to use this?
 
-Need Rust first. Then install `chisel` using cargo:
+Install Rust first. Add the wasm32 target to the toolchain and install `chisel` using cargo:
 ```sh
+rustup target add wasm32-unknown-unknown
+rustup component add rustfmt
+rustup update
 cargo install chisel
 ```
 
