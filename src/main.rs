@@ -293,9 +293,10 @@ pub fn process_shard_block(
 
 fn load_file(filename: &str) -> Vec<u8> {
     use std::io::prelude::*;
-    let mut file = File::open(filename).expect("loading file failed");
+    let mut file = File::open(filename).expect(&format!("loading file {} failed", filename));
     let mut buf = Vec::new();
-    file.read_to_end(&mut buf).expect("reading file failed");
+    file.read_to_end(&mut buf)
+        .expect(&format!("reading file {} failed", filename));
     buf
 }
 
@@ -367,7 +368,7 @@ impl From<TestShardState> for ShardState {
 }
 
 fn process_yaml_test(filename: &str) {
-    info!("Process yaml!");
+    info!("Processing {}...", filename);
     let content = load_file(&filename);
     let test_file: TestFile =
         serde_yaml::from_slice::<TestFile>(&content[..]).expect("expected valid yaml");
