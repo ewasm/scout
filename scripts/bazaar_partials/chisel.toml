@@ -1,5 +1,5 @@
 bazaar:
-  file: "target/wasm32-unknown-unknown/release/phase2_bazaar.wasm"
+  file: "target/wasm32-unknown-unknown/release/phase2_bazaar_partials.wasm"
   trimexports:
     preset: "ewasm"
   verifyexports:
