@@ -80,11 +80,23 @@ const DEBUG_PRINTMEMHEX_FUNC: usize = 9;
 const BIGNUM_ADD256_FUNC: usize = 10;
 const BIGNUM_SUB256_FUNC: usize = 11;
 
+fn load_import(code: &[u8]) -> Result<wasmi::ModuleRef, ScoutError> {
+    let module = Module::from_buffer(&code)?;
+    let imports = ImportsBuilder::new();
+    let instance = ModuleInstance::new(&module, &imports)?.run_start(&mut NopExternals)?;
+    Ok(instance)
+}
+
+// FIXME: make this nicer
+// Tuple of name -> code
+type Libraries<'a> = [(&'a str, &'a [u8])];
+
 // TODO: move elsehwere?
 type DepositBlob = Vec<u8>;
 
 struct Runtime<'a> {
     code: &'a [u8],
+    libraries: &'a Libraries<'a>,
     ticks_left: u32,
     memory: Option<MemoryRef>,
     pre_state: &'a Bytes32,
@@ -94,9 +106,15 @@ struct Runtime<'a> {
 }
 
 impl<'a> Runtime<'a> {
-    fn new(code: &'a [u8], pre_state: &'a Bytes32, block_data: &'a ShardBlockBody) -> Runtime<'a> {
+    fn new(
+        code: &'a [u8],
+        libraries: &'a Libraries,
+        pre_state: &'a Bytes32,
+        block_data: &'a ShardBlockBody,
+    ) -> Runtime<'a> {
         Runtime {
             code: code,
+            libraries: libraries,
             ticks_left: 10_000_000, // FIXME: make this configurable
             memory: None,
             pre_state: pre_state,
@@ -114,6 +132,21 @@ impl<'a> Runtime<'a> {
         imports.push_resolver("eth2", &Eth2ImportResolver);
         imports.push_resolver("bignum", &BignumImportResolver);
         imports.push_resolver("debug", &DebugImportResolver);
+
+        // Load all libraries
+        // NOTE: creating this variable here to track lifetime
+        let libraries: Result<Vec<(String, wasmi::ModuleRef)>, ScoutError> = self
+            .libraries
+            .iter()
+            .map(|(ref name, ref code)| Ok((name.to_string(), load_import(code)?)))
+            .collect();
+        let libraries = libraries?;
+
+        // Link them to the current instance
+        for library in &libraries {
+            debug!("Attaching library: {}", &library.0);
+            imports.push_resolver(&library.0, &library.1);
+        }
 
         let instance = ModuleInstance::new(&module, &imports)?.run_start(&mut NopExternals)?;
 
@@ -623,6 +656,7 @@ impl fmt::Display for ShardState {
 
 pub fn execute_code(
     code: &[u8],
+    libraries: &Libraries,
     pre_state: &Bytes32,
     block_data: &ShardBlockBody,
 ) -> Result<(Bytes32, Vec<DepositBlob>), ScoutError> {
@@ -632,7 +666,7 @@ pub fn execute_code(
         block_data
     );
 
-    let mut runtime = Runtime::new(&code, pre_state, block_data);
+    let mut runtime = Runtime::new(&code, &libraries, pre_state, block_data);
     runtime.execute()
 }
 
@@ -659,7 +693,7 @@ pub fn process_shard_block(
         //     state.exec_env_states.push(ZERO_HASH)
         // }
         let pre_state = &state.exec_env_states[env];
-        let (post_state, deposits) = execute_code(code, pre_state, &block.data)?;
+        let (post_state, deposits) = execute_code(code, &Vec::new(), pre_state, &block.data)?;
         state.exec_env_states[env] = post_state;
 
         // Decode deposits.
