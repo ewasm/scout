@@ -239,7 +239,8 @@ pub fn execute_code(
 
     let instance = ModuleInstance::new(&module, &imports)
         .expect("Module instantation expected to succeed")
-        .assert_no_start();
+        .run_start(&mut NopExternals)
+        .expect("Failed to run start function in module");
 
     let internal_mem = instance
         .export_by_name("memory")
