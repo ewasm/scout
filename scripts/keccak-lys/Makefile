@@ -1,0 +1,2 @@
+all:
+	lys main.lys

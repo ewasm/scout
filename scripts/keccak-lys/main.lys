@@ -1,0 +1,16 @@
+import system::hash::keccak
+
+import eth2
+
+#[export]
+fun main(): void = {
+   var len = blockDataSize()
+   var input = bytes(len)
+   blockDataCopy(input.ptr, 0 as u32, len)
+
+   var k = Keccak()
+   Keccak.update(k, input)
+   var ret = Keccak.digest(k)
+
+   savePostStateRoot(ret.ptr)
+}
