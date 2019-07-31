@@ -4,7 +4,7 @@ extern crate wasmi;
 extern crate log;
 extern crate env_logger;
 
-use rustc_hex::FromHex;
+use rustc_hex::{FromHex, ToHex};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs::File;
@@ -24,6 +24,10 @@ const BLOCKDATACOPY_FUNC_INDEX: usize = 2;
 const SAVEPOSTSTATEROOT_FUNC_INDEX: usize = 3;
 const PUSHNEWDEPOSIT_FUNC_INDEX: usize = 4;
 const USETICKS_FUNC_INDEX: usize = 5;
+const DEBUG_PRINT32_FUNC: usize = 6;
+const DEBUG_PRINT64_FUNC: usize = 7;
+const DEBUG_PRINTMEM_FUNC: usize = 8;
+const DEBUG_PRINTMEMHEX_FUNC: usize = 9;
 
 struct Runtime<'a> {
     ticks_left: u32,
@@ -125,6 +129,42 @@ impl<'a> Externals for Runtime<'a> {
                 Ok(None)
             }
             PUSHNEWDEPOSIT_FUNC_INDEX => unimplemented!(),
+            DEBUG_PRINT32_FUNC => {
+                let value: u32 = args.nth(0);
+                debug!("print.i32: {}", value);
+                Ok(None)
+            }
+            DEBUG_PRINT64_FUNC => {
+                let value: u64 = args.nth(0);
+                debug!("print.i64: {}", value);
+                Ok(None)
+            }
+            DEBUG_PRINTMEM_FUNC => {
+                let ptr: u32 = args.nth(0);
+                let length: u32 = args.nth(1);
+                let mut buf = Vec::with_capacity(length as usize);
+                unsafe { buf.set_len(length as usize) };
+                // TODO: add checks for out of bounds access
+                let memory = self.memory.as_ref().expect("expects memory object");
+                memory
+                    .get_into(ptr, &mut buf)
+                    .expect("expects reading from memory to succeed");
+                debug!("print: {}", String::from_utf8_lossy(&buf));
+                Ok(None)
+            }
+            DEBUG_PRINTMEMHEX_FUNC => {
+                let ptr: u32 = args.nth(0);
+                let length: u32 = args.nth(1);
+                let mut buf = Vec::with_capacity(length as usize);
+                unsafe { buf.set_len(length as usize) };
+                // TODO: add checks for out of bounds access
+                let memory = self.memory.as_ref().expect("expects memory object");
+                memory
+                    .get_into(ptr, &mut buf)
+                    .expect("expects reading from memory to succeed");
+                debug!("print.hex: {}", buf.to_hex());
+                Ok(None)
+            }
             _ => panic!("unknown function index"),
         }
     }
@@ -162,6 +202,22 @@ impl<'a> ModuleImportResolver for RuntimeModuleImportResolver {
             "eth2_pushNewDeposit" => FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32, ValueType::I32][..], None),
                 PUSHNEWDEPOSIT_FUNC_INDEX,
+            ),
+            "debug_print32" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32][..], None),
+                DEBUG_PRINT32_FUNC,
+            ),
+            "debug_print64" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I64][..], None),
+                DEBUG_PRINT64_FUNC,
+            ),
+            "debug_printMem" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32, ValueType::I32][..], None),
+                DEBUG_PRINTMEM_FUNC,
+            ),
+            "debug_printMemHex" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32, ValueType::I32][..], None),
+                DEBUG_PRINTMEMHEX_FUNC,
             ),
             _ => {
                 return Err(InterpreterError::Function(format!(
