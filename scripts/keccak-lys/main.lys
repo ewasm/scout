@@ -9,7 +9,15 @@ fun main(): void = {
    blockDataCopy(input.ptr, 0 as u32, len)
 
    var k = Keccak()
-   Keccak.update(k, input)
+   var i = 0
+   loop {
+     if (i < 256) {
+       i = i + 1
+       Keccak.update(k, input)
+       continue
+     }
+     break
+   }
    var ret = Keccak.digest(k)
 
    savePostStateRoot(ret.ptr)
