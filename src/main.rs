@@ -1,178 +1,11 @@
-extern crate rustc_hex;
-extern crate wasmi;
-
+use ewasm::{Execute, Runtime};
 use rustc_hex::FromHex;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs::File;
-use wasmi::memory_units::Pages;
-use wasmi::{
-    Error as InterpreterError, Externals, FuncInstance, FuncRef, ImportsBuilder, MemoryInstance,
-    MemoryRef, Module, ModuleImportResolver, ModuleInstance, NopExternals, RuntimeArgs,
-    RuntimeValue, Signature, Trap, TrapKind, ValueType,
-};
 
 mod types;
 use crate::types::*;
-
-const LOADPRESTATEROOT_FUNC_INDEX: usize = 0;
-const BLOCKDATASIZE_FUNC_INDEX: usize = 1;
-const BLOCKDATACOPY_FUNC_INDEX: usize = 2;
-const SAVEPOSTSTATEROOT_FUNC_INDEX: usize = 3;
-const PUSHNEWDEPOSIT_FUNC_INDEX: usize = 4;
-const USETICKS_FUNC_INDEX: usize = 5;
-
-struct Runtime<'a> {
-    ticks_left: u32,
-    memory: Option<MemoryRef>,
-    pre_state: &'a Bytes32,
-    block_data: &'a ShardBlockBody,
-    post_state: Bytes32,
-}
-
-impl<'a> Runtime<'a> {
-    fn new(
-        pre_state: &'a Bytes32,
-        block_data: &'a ShardBlockBody,
-        memory: Option<MemoryRef>,
-    ) -> Runtime<'a> {
-        Runtime {
-            ticks_left: 10_000_000, // FIXME: make this configurable
-            memory: if memory.is_some() {
-                memory
-            } else {
-                // Allocate a single page if no memory was exported.
-                Some(MemoryInstance::alloc(Pages(1), Some(Pages(1))).unwrap())
-            },
-            pre_state: pre_state,
-            block_data: block_data,
-            post_state: Bytes32::default(),
-        }
-    }
-
-    fn get_post_state(&self) -> Bytes32 {
-        self.post_state
-    }
-}
-
-impl<'a> Externals for Runtime<'a> {
-    fn invoke_index(
-        &mut self,
-        index: usize,
-        args: RuntimeArgs,
-    ) -> Result<Option<RuntimeValue>, Trap> {
-        match index {
-            USETICKS_FUNC_INDEX => {
-                let ticks: u32 = args.nth(0);
-                if self.ticks_left < ticks {
-                    // FIXME: use TrapKind::Host
-                    return Err(Trap::new(TrapKind::Unreachable));
-                }
-                self.ticks_left -= ticks;
-                Ok(None)
-            }
-            LOADPRESTATEROOT_FUNC_INDEX => {
-                let ptr: u32 = args.nth(0);
-                println!("loadprestateroot to {}", ptr);
-
-                // TODO: add checks for out of bounds access
-                let memory = self.memory.as_ref().expect("expects memory object");
-                memory
-                    .set(ptr, &self.pre_state.bytes)
-                    .expect("expects writing to memory to succeed");
-
-                Ok(None)
-            }
-            SAVEPOSTSTATEROOT_FUNC_INDEX => {
-                let ptr: u32 = args.nth(0);
-                println!("savepoststateroot from {}", ptr);
-
-                // TODO: add checks for out of bounds access
-                let memory = self.memory.as_ref().expect("expects memory object");
-                memory
-                    .get_into(ptr, &mut self.post_state.bytes)
-                    .expect("expects reading from memory to succeed");
-
-                Ok(None)
-            }
-            BLOCKDATASIZE_FUNC_INDEX => {
-                let ret: i32 = self.block_data.data.len() as i32;
-                println!("blockdatasize {}", ret);
-                Ok(Some(ret.into()))
-            }
-            BLOCKDATACOPY_FUNC_INDEX => {
-                let ptr: u32 = args.nth(0);
-                let offset: u32 = args.nth(1);
-                let length: u32 = args.nth(2);
-                println!(
-                    "blockdatacopy to {} from {} for {} bytes",
-                    ptr, offset, length
-                );
-
-                // TODO: add overflow check
-                let offset = offset as usize;
-                let length = length as usize;
-
-                // TODO: add checks for out of bounds access
-                let memory = self.memory.as_ref().expect("expects memory object");
-                memory
-                    .set(ptr, &self.block_data.data[offset..length])
-                    .expect("expects writing to memory to succeed");
-
-                Ok(None)
-            }
-            PUSHNEWDEPOSIT_FUNC_INDEX => unimplemented!(),
-            _ => panic!("unknown function index"),
-        }
-    }
-}
-
-struct RuntimeModuleImportResolver;
-
-impl<'a> ModuleImportResolver for RuntimeModuleImportResolver {
-    fn resolve_func(
-        &self,
-        field_name: &str,
-        _signature: &Signature,
-    ) -> Result<FuncRef, InterpreterError> {
-        let func_ref = match field_name {
-            "eth2_useTicks" => FuncInstance::alloc_host(
-                Signature::new(&[ValueType::I32][..], None),
-                USETICKS_FUNC_INDEX,
-            ),
-            "eth2_loadPreStateRoot" => FuncInstance::alloc_host(
-                Signature::new(&[ValueType::I32][..], None),
-                LOADPRESTATEROOT_FUNC_INDEX,
-            ),
-            "eth2_blockDataSize" => FuncInstance::alloc_host(
-                Signature::new(&[][..], Some(ValueType::I32)),
-                BLOCKDATASIZE_FUNC_INDEX,
-            ),
-            "eth2_blockDataCopy" => FuncInstance::alloc_host(
-                Signature::new(&[ValueType::I32, ValueType::I32, ValueType::I32][..], None),
-                BLOCKDATACOPY_FUNC_INDEX,
-            ),
-            "eth2_savePostStateRoot" => FuncInstance::alloc_host(
-                Signature::new(&[ValueType::I32][..], None),
-                SAVEPOSTSTATEROOT_FUNC_INDEX,
-            ),
-            "eth2_pushNewDeposit" => FuncInstance::alloc_host(
-                Signature::new(&[ValueType::I32][..], None),
-                PUSHNEWDEPOSIT_FUNC_INDEX,
-            ),
-            _ => {
-                return Err(InterpreterError::Function(format!(
-                    "host module doesn't export function with name {}",
-                    field_name
-                )))
-            }
-        };
-        Ok(func_ref)
-    }
-}
-
-const BYTES_PER_SHARD_BLOCK_BODY: usize = 16384;
-const ZERO_HASH: Bytes32 = Bytes32 { bytes: [0u8; 32] };
 
 /// These are Phase 0 structures.
 /// https://github.com/ethereum/eth2.0-specs/blob/dev/specs/core/0_beacon-chain.md
@@ -229,32 +62,10 @@ pub fn execute_code(
         block_data
     );
 
-    let module = Module::from_buffer(&code).expect("Module loading to succeed");
-    let mut imports = ImportsBuilder::new();
-    // FIXME: use eth2
-    imports.push_resolver("env", &RuntimeModuleImportResolver);
+    let mut runtime = Runtime::new(code, &block_data.data, pre_state.bytes);
+    let post_root = runtime.execute();
 
-    let instance = ModuleInstance::new(&module, &imports)
-        .expect("Module instantation expected to succeed")
-        .assert_no_start();
-
-    let internal_mem = instance
-        .export_by_name("memory")
-        .expect("Module expected to have 'memory' export")
-        .as_memory()
-        .cloned()
-        .expect("'memory' export should be a memory");
-
-    let mut runtime = Runtime::new(pre_state, block_data, Some(internal_mem));
-
-    let result = instance
-        .invoke_export("main", &[], &mut runtime)
-        .expect("Executed 'main'");
-
-    println!("Result: {:?}", result);
-    println!("Execution finished");
-
-    (runtime.get_post_state(), vec![Deposit {}])
+    (Bytes32 { bytes: post_root }, vec![Deposit {}])
 }
 
 pub fn process_shard_block(
