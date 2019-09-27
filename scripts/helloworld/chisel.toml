@@ -4,5 +4,5 @@ helloworld:
     preset: "ewasm"
   verifyexports:
     preset: "ewasm"
-  repack:
+  snip:
     preset: "ewasm"
