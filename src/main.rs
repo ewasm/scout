@@ -473,7 +473,13 @@ fn process_yaml_test(filename: &str) {
         process_shard_block(&mut shard_state, &beacon_state, Some(block.into()))
     }
     debug!("{}", shard_state);
-    assert_eq!(shard_state, post_state);
+    if shard_state != post_state {
+        println!("Expected state: {}", post_state);
+        println!("Got state: {}", shard_state);
+        std::process::exit(1);
+    } else {
+        println!("Matching state.");
+    }
 }
 
 fn main() {
