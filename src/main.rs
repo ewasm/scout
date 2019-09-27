@@ -157,7 +157,7 @@ impl<'a> ModuleImportResolver for RuntimeModuleImportResolver {
                 SAVEPOSTSTATEROOT_FUNC_INDEX,
             ),
             "eth2_pushNewDeposit" => FuncInstance::alloc_host(
-                Signature::new(&[ValueType::I32][..], None),
+                Signature::new(&[ValueType::I32, ValueType::I32][..], None),
                 PUSHNEWDEPOSIT_FUNC_INDEX,
             ),
             _ => {
