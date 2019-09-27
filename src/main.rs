@@ -7,6 +7,7 @@ extern crate env_logger;
 use rustc_hex::{FromHex, ToHex};
 use serde::{Deserialize, Serialize};
 use std::env;
+use std::fmt;
 use std::fs::File;
 use wasmi::memory_units::Pages;
 use wasmi::{
@@ -277,13 +278,44 @@ pub struct ShardState {
     // latest_state_roots: [bytes32, LATEST_STATE_ROOTS_LEMGTH]
 }
 
+impl fmt::Display for ShardBlockBody {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.data.to_hex())
+    }
+}
+
+impl fmt::Display for ShardBlock {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Shard block for environment {} with data {}",
+            self.env, self.data
+        )
+    }
+}
+
+impl fmt::Display for ShardState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let states: Vec<String> = self
+            .exec_env_states
+            .iter()
+            .map(|x| x.bytes.to_hex())
+            .collect();
+        write!(
+            f,
+            "Shard slot {} with environment states: {:?}",
+            self.slot, states
+        )
+    }
+}
+
 pub fn execute_code(
     code: &[u8],
     pre_state: &Bytes32,
     block_data: &ShardBlockBody,
 ) -> (Bytes32, Vec<Deposit>) {
     debug!(
-        "Executing codesize({}) and data: {:#?}",
+        "Executing codesize({}) and data: {}",
         code.len(),
         block_data
     );
@@ -323,13 +355,14 @@ pub fn process_shard_block(
     block: Option<ShardBlock>,
 ) {
     // println!("Beacon state: {:#?}", beacon_state);
-    info!("Executing block: {:#?}", block);
 
-    info!("Pre-execution: {:#?}", state);
+    info!("Pre-execution: {}", state);
 
     // TODO: implement state root handling
 
     if let Some(block) = block {
+        info!("Executing block: {}", block);
+
         // The execution environment identifier
         let env = block.env as usize; // FIXME: usize can be 32-bit
         let code = &beacon_state.execution_scripts[env].code;
@@ -345,7 +378,7 @@ pub fn process_shard_block(
 
     // TODO: implement state + deposit root handling
 
-    info!("Post-execution: {:#?}", state)
+    info!("Post-execution: {}", state)
 }
 
 fn load_file(filename: &str) -> Vec<u8> {
@@ -439,7 +472,7 @@ fn process_yaml_test(filename: &str) {
     for block in test_file.shard_blocks {
         process_shard_block(&mut shard_state, &beacon_state, Some(block.into()))
     }
-    debug!("{:#?}", shard_state);
+    debug!("{}", shard_state);
     assert_eq!(shard_state, post_state);
 }
 
