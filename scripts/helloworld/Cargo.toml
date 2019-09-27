@@ -9,7 +9,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
-ewasm_api = { version = "0.11", features = ["std", "eth2", "qimalloc"] }
+ewasm_api = { version = "0.11", features = ["std", "eth2", "qimalloc", "debug"] }
 
 [lib]
 crate-type = ["cdylib"]
