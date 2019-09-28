@@ -19,5 +19,10 @@ pub extern "C" fn main() {
     // No updates were made to the state
     let post_state_root = pre_state_root;
 
+    // Deposit only for demo purposes
+    // This is valid length-wise, but invalid content-wise
+    let deposit = [0u8; 184];
+    eth2::push_new_deposit(&deposit);
+
     eth2::save_post_state_root(&post_state_root)
 }
