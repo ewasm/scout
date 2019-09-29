@@ -11,6 +11,7 @@ use primitive_types::U256;
 use rustc_hex::{FromHex, ToHex};
 use serde::{Deserialize, Serialize};
 use ssz::{Decode, Encode};
+use std::convert::{TryFrom, TryInto};
 use std::env;
 use std::error::Error;
 use std::fmt;
@@ -28,6 +29,14 @@ pub struct ScoutError(String);
 
 impl From<std::io::Error> for ScoutError {
     fn from(error: std::io::Error) -> Self {
+        ScoutError {
+            0: error.description().to_string(),
+        }
+    }
+}
+
+impl From<rustc_hex::FromHexError> for ScoutError {
+    fn from(error: rustc_hex::FromHexError) -> Self {
         ScoutError {
             0: error.description().to_string(),
         }
@@ -705,91 +714,107 @@ struct TestFile {
     deposit_receipts: Vec<TestDeposit>,
 }
 
-fn hex_to_slice(input: &str, output: &mut [u8]) {
-    let tmp = input.from_hex().expect("invalid hex data");
-    assert!(tmp.len() == output.len());
+fn hex_to_slice(input: &str, output: &mut [u8]) -> Result<(), ScoutError> {
+    let tmp = input.from_hex()?;
+    if tmp.len() != output.len() {
+        return Err(ScoutError("Length mismatch from hex input".to_string()));
+    }
     output.copy_from_slice(&tmp[..]);
+    Ok(())
 }
 
-impl From<&String> for Bytes32 {
-    fn from(input: &String) -> Self {
+impl TryFrom<&String> for Bytes32 {
+    type Error = ScoutError;
+    fn try_from(input: &String) -> Result<Self, Self::Error> {
         let mut ret = Bytes32::default();
-        hex_to_slice(input, &mut ret.bytes);
-        ret
+        hex_to_slice(input, &mut ret.bytes)?;
+        Ok(ret)
     }
 }
 
-impl From<String> for Hash {
-    fn from(input: String) -> Self {
+impl TryFrom<String> for Hash {
+    type Error = ScoutError;
+    fn try_from(input: String) -> Result<Self, Self::Error> {
         let mut ret = Hash::default();
-        hex_to_slice(&input, &mut ret.0);
-        ret
+        hex_to_slice(&input, &mut ret.0)?;
+        Ok(ret)
     }
 }
 
-impl From<String> for BLSPubKey {
-    fn from(input: String) -> Self {
+impl TryFrom<String> for BLSPubKey {
+    type Error = ScoutError;
+    fn try_from(input: String) -> Result<Self, Self::Error> {
         let mut ret = BLSPubKey::default();
-        hex_to_slice(&input, &mut ret.0);
-        ret
+        hex_to_slice(&input, &mut ret.0)?;
+        Ok(ret)
     }
 }
 
-impl From<String> for BLSSignature {
-    fn from(input: String) -> Self {
+impl TryFrom<String> for BLSSignature {
+    type Error = ScoutError;
+    fn try_from(input: String) -> Result<Self, Self::Error> {
         let mut ret = BLSSignature::default();
-        hex_to_slice(&input, &mut ret.0);
-        ret
+        hex_to_slice(&input, &mut ret.0)?;
+        Ok(ret)
     }
 }
 
-impl From<TestBeaconState> for BeaconState {
-    fn from(input: TestBeaconState) -> Self {
-        BeaconState {
-            execution_scripts: input
-                .execution_scripts
-                .iter()
-                .map(|filename| ExecutionScript {
-                    code: std::fs::read(filename).expect("to load file"),
+impl TryFrom<TestBeaconState> for BeaconState {
+    type Error = ScoutError;
+    fn try_from(input: TestBeaconState) -> Result<Self, Self::Error> {
+        let scripts: Result<Vec<ExecutionScript>, ScoutError> = input
+            .execution_scripts
+            .iter()
+            .map(|filename| {
+                Ok(ExecutionScript {
+                    code: std::fs::read(filename)?,
                 })
-                .collect(),
-        }
+            })
+            .collect();
+        Ok(BeaconState {
+            execution_scripts: scripts?,
+        })
     }
 }
 
-impl From<TestShardBlock> for ShardBlock {
-    fn from(input: TestShardBlock) -> Self {
-        ShardBlock {
+impl TryFrom<TestShardBlock> for ShardBlock {
+    type Error = ScoutError;
+    fn try_from(input: TestShardBlock) -> Result<Self, Self::Error> {
+        Ok(ShardBlock {
             env: input.env,
             data: ShardBlockBody {
-                data: input.data.from_hex().expect("invalid hex data"),
+                data: input.data.from_hex()?,
             },
-        }
+        })
     }
 }
 
-impl From<TestShardState> for ShardState {
-    fn from(input: TestShardState) -> Self {
-        ShardState {
-            exec_env_states: input
-                .exec_env_states
-                .iter()
-                .map(|state| state.into())
-                .collect(),
+impl TryFrom<TestShardState> for ShardState {
+    type Error = ScoutError;
+    fn try_from(input: TestShardState) -> Result<Self, Self::Error> {
+        let states: Result<Vec<Bytes32>, ScoutError> = input
+            .exec_env_states
+            .iter()
+            .map(|state| state.try_into())
+            .collect();
+
+        Ok(ShardState {
+            exec_env_states: states?,
             slot: 0,
             parent_block: ShardBlockHeader {},
-        }
+        })
     }
 }
 
-impl From<TestDeposit> for Deposit {
-    fn from(input: TestDeposit) -> Self {
-        Deposit {
-            pubkey: input.pubkey.into(),
-            withdrawal_credentials: input.withdrawal_credentials.into(),
+impl TryFrom<TestDeposit> for Deposit {
+    type Error = ScoutError;
+    fn try_from(input: TestDeposit) -> Result<Self, Self::Error> {
+        Ok(Deposit {
+            pubkey: input.pubkey.try_into()?,
+            withdrawal_credentials: input.withdrawal_credentials.try_into()?,
             amount: input.amount,
-            signature: input.signature.into(),
-        }
+            signature: input.signature.try_into()?,
+        })
     }
 }
 
@@ -800,22 +825,35 @@ fn process_yaml_test(filename: &str) {
         serde_yaml::from_slice::<TestFile>(&content[..]).expect("expected valid yaml");
     debug!("{:#?}", test_file);
 
-    let beacon_state: BeaconState = test_file.beacon_state.into();
-    let pre_state: ShardState = test_file.shard_pre_state.into();
-    let post_state: ShardState = test_file.shard_post_state.into();
+    let beacon_state: BeaconState = test_file
+        .beacon_state
+        .try_into()
+        .expect("valid beacon_state definition");
+    let pre_state: ShardState = test_file
+        .shard_pre_state
+        .try_into()
+        .expect("valid pre_state befinition");
+    let post_state: ShardState = test_file
+        .shard_post_state
+        .try_into()
+        .expect("valid post_state definition");
     let expected_deposit_receipts: Vec<Deposit> = test_file
         .deposit_receipts
         .into_iter()
-        .map(|deposit| deposit.into())
+        .map(|deposit| deposit.try_into().expect("valid deposit"))
         .collect();
 
     let mut shard_state = pre_state;
     let mut deposit_receipts = Vec::new();
     for block in test_file.shard_blocks {
         deposit_receipts.append(
-            process_shard_block(&mut shard_state, &beacon_state, Some(block.into()))
-                .expect("processing shard block to succeed")
-                .as_mut(),
+            process_shard_block(
+                &mut shard_state,
+                &beacon_state,
+                Some(block.try_into().expect("valid block")),
+            )
+            .expect("processing shard block to succeed")
+            .as_mut(),
         );
     }
 
