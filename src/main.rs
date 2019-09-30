@@ -23,6 +23,25 @@ use wasmi::{
 mod types;
 use crate::types::*;
 
+#[derive(Debug)]
+pub struct ScoutError(String);
+
+impl From<wasmi::Error> for ScoutError {
+    fn from(error: InterpreterError) -> Self {
+        ScoutError {
+            0: error.description().to_string(),
+        }
+    }
+}
+
+impl From<wasmi::Trap> for ScoutError {
+    fn from(error: wasmi::Trap) -> Self {
+        ScoutError {
+            0: error.description().to_string(),
+        }
+    }
+}
+
 const LOADPRESTATEROOT_FUNC_INDEX: usize = 0;
 const BLOCKDATASIZE_FUNC_INDEX: usize = 1;
 const BLOCKDATACOPY_FUNC_INDEX: usize = 2;
@@ -563,7 +582,7 @@ pub fn execute_code(
     code: &[u8],
     pre_state: &Bytes32,
     block_data: &ShardBlockBody,
-) -> Result<(Bytes32, Vec<DepositBlob>), Box<dyn Error>> {
+) -> Result<(Bytes32, Vec<DepositBlob>), ScoutError> {
     debug!(
         "Executing codesize({}) and data: {}",
         code.len(),
@@ -602,7 +621,7 @@ pub fn process_shard_block(
     state: &mut ShardState,
     beacon_state: &BeaconState,
     block: Option<ShardBlock>,
-) -> Result<Vec<Deposit>, Box<dyn Error>> {
+) -> Result<Vec<Deposit>, ScoutError> {
     // println!("Beacon state: {:#?}", beacon_state);
 
     info!("Pre-execution: {}", state);
