@@ -8,6 +8,7 @@ use primitive_types::U256;
 use rustc_hex::{FromHex, ToHex};
 use serde::{Deserialize, Serialize};
 use std::env;
+use std::error::Error;
 use std::fmt;
 use wasmi::memory_units::Pages;
 use wasmi::{
@@ -381,23 +382,21 @@ pub fn execute_code(
     code: &[u8],
     pre_state: &Bytes32,
     block_data: &ShardBlockBody,
-) -> (Bytes32, Vec<Deposit>) {
+) -> Result<(Bytes32, Vec<Deposit>), Box<dyn Error>> {
     debug!(
         "Executing codesize({}) and data: {}",
         code.len(),
         block_data
     );
 
-    let module = Module::from_buffer(&code).expect("Module loading to succeed");
+    let module = Module::from_buffer(&code)?;
     let mut imports = ImportsBuilder::new();
     // FIXME: use eth2
     imports.push_resolver("env", &RuntimeModuleImportResolver);
 
-    let instance = ModuleInstance::new(&module, &imports)
-        .expect("Module instantation expected to succeed")
-        .run_start(&mut NopExternals)
-        .expect("Failed to run start function in module");
+    let instance = ModuleInstance::new(&module, &imports)?.run_start(&mut NopExternals)?;
 
+    // FIXME: pass through errors here and not use .expect()
     let internal_mem = instance
         .export_by_name("memory")
         .expect("Module expected to have 'memory' export")
@@ -407,21 +406,19 @@ pub fn execute_code(
 
     let mut runtime = Runtime::new(pre_state, block_data, Some(internal_mem));
 
-    let result = instance
-        .invoke_export("main", &[], &mut runtime)
-        .expect("Executed 'main'");
+    let result = instance.invoke_export("main", &[], &mut runtime)?;
 
     info!("Result: {:?}", result);
     info!("Execution finished");
 
-    (runtime.get_post_state(), vec![Deposit {}])
+    Ok((runtime.get_post_state(), vec![Deposit {}]))
 }
 
 pub fn process_shard_block(
     state: &mut ShardState,
     beacon_state: &BeaconState,
     block: Option<ShardBlock>,
-) {
+) -> Result<(), Box<dyn Error>> {
     // println!("Beacon state: {:#?}", beacon_state);
 
     info!("Pre-execution: {}", state);
@@ -440,13 +437,15 @@ pub fn process_shard_block(
         //     state.exec_env_states.push(ZERO_HASH)
         // }
         let pre_state = &state.exec_env_states[env];
-        let (post_state, deposits) = execute_code(code, pre_state, &block.data);
+        let (post_state, deposits) = execute_code(code, pre_state, &block.data)?;
         state.exec_env_states[env] = post_state
     }
 
     // TODO: implement state + deposit root handling
 
-    info!("Post-execution: {}", state)
+    info!("Post-execution: {}", state);
+
+    Ok(())
 }
 
 fn load_file(filename: &str) -> Vec<u8> {
@@ -534,6 +533,7 @@ fn process_yaml_test(filename: &str) {
     let mut shard_state = pre_state;
     for block in test_file.shard_blocks {
         process_shard_block(&mut shard_state, &beacon_state, Some(block.into()))
+            .expect("processing shard block to succeed")
     }
     debug!("{}", shard_state);
     if shard_state != post_state {
