@@ -232,6 +232,7 @@ impl<'a> Externals for Runtime<'a> {
     }
 }
 
+// TODO: remove this and rely on Eth2ImportResolver and DebugImportResolver
 struct RuntimeModuleImportResolver;
 
 impl<'a> ModuleImportResolver for RuntimeModuleImportResolver {
@@ -288,6 +289,114 @@ impl<'a> ModuleImportResolver for RuntimeModuleImportResolver {
             "bignum_sub256" => FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32, ValueType::I32, ValueType::I32][..], None),
                 BIGNUM_SUB256_FUNC,
+            ),
+            _ => {
+                return Err(InterpreterError::Function(format!(
+                    "host module doesn't export function with name {}",
+                    field_name
+                )))
+            }
+        };
+        Ok(func_ref)
+    }
+}
+
+struct Eth2ImportResolver;
+
+impl<'a> ModuleImportResolver for Eth2ImportResolver {
+    fn resolve_func(
+        &self,
+        field_name: &str,
+        _signature: &Signature,
+    ) -> Result<FuncRef, InterpreterError> {
+        let func_ref = match field_name {
+            "useTicks" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32][..], None),
+                USETICKS_FUNC_INDEX,
+            ),
+            "loadPreStateRoot" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32][..], None),
+                LOADPRESTATEROOT_FUNC_INDEX,
+            ),
+            "blockDataSize" => FuncInstance::alloc_host(
+                Signature::new(&[][..], Some(ValueType::I32)),
+                BLOCKDATASIZE_FUNC_INDEX,
+            ),
+            "blockDataCopy" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32, ValueType::I32, ValueType::I32][..], None),
+                BLOCKDATACOPY_FUNC_INDEX,
+            ),
+            "savePostStateRoot" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32][..], None),
+                SAVEPOSTSTATEROOT_FUNC_INDEX,
+            ),
+            "pushNewDeposit" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32, ValueType::I32][..], None),
+                PUSHNEWDEPOSIT_FUNC_INDEX,
+            ),
+            _ => {
+                return Err(InterpreterError::Function(format!(
+                    "host module doesn't export function with name {}",
+                    field_name
+                )))
+            }
+        };
+        Ok(func_ref)
+    }
+}
+
+struct BignumImportResolver;
+
+impl<'a> ModuleImportResolver for BignumImportResolver {
+    fn resolve_func(
+        &self,
+        field_name: &str,
+        _signature: &Signature,
+    ) -> Result<FuncRef, InterpreterError> {
+        let func_ref = match field_name {
+            "add256" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32, ValueType::I32, ValueType::I32][..], None),
+                BIGNUM_ADD256_FUNC,
+            ),
+            "sub256" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32, ValueType::I32, ValueType::I32][..], None),
+                BIGNUM_SUB256_FUNC,
+            ),
+            _ => {
+                return Err(InterpreterError::Function(format!(
+                    "host module doesn't export function with name {}",
+                    field_name
+                )))
+            }
+        };
+        Ok(func_ref)
+    }
+}
+
+struct DebugImportResolver;
+
+impl<'a> ModuleImportResolver for DebugImportResolver {
+    fn resolve_func(
+        &self,
+        field_name: &str,
+        _signature: &Signature,
+    ) -> Result<FuncRef, InterpreterError> {
+        let func_ref = match field_name {
+            "print32" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32][..], None),
+                DEBUG_PRINT32_FUNC,
+            ),
+            "print64" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I64][..], None),
+                DEBUG_PRINT64_FUNC,
+            ),
+            "printMem" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32, ValueType::I32][..], None),
+                DEBUG_PRINTMEM_FUNC,
+            ),
+            "printMemHex" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32, ValueType::I32][..], None),
+                DEBUG_PRINTMEMHEX_FUNC,
             ),
             _ => {
                 return Err(InterpreterError::Function(format!(
@@ -391,8 +500,11 @@ pub fn execute_code(
 
     let module = Module::from_buffer(&code)?;
     let mut imports = ImportsBuilder::new();
-    // FIXME: use eth2
+    // TODO: remove this and rely on Eth2ImportResolver and DebugImportResolver
     imports.push_resolver("env", &RuntimeModuleImportResolver);
+    imports.push_resolver("eth2", &Eth2ImportResolver);
+    imports.push_resolver("bignum", &BignumImportResolver);
+    imports.push_resolver("debug", &DebugImportResolver);
 
     let instance = ModuleInstance::new(&module, &imports)?.run_start(&mut NopExternals)?;
 
