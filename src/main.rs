@@ -4,6 +4,7 @@ extern crate wasmi;
 extern crate log;
 extern crate env_logger;
 
+use primitive_types::U256;
 use rustc_hex::{FromHex, ToHex};
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -29,6 +30,8 @@ const DEBUG_PRINT32_FUNC: usize = 6;
 const DEBUG_PRINT64_FUNC: usize = 7;
 const DEBUG_PRINTMEM_FUNC: usize = 8;
 const DEBUG_PRINTMEMHEX_FUNC: usize = 9;
+const BIGNUM_ADD256_FUNC: usize = 10;
+const BIGNUM_SUB256_FUNC: usize = 11;
 
 struct Runtime<'a> {
     ticks_left: u32,
@@ -166,6 +169,64 @@ impl<'a> Externals for Runtime<'a> {
                 debug!("print.hex: {}", buf.to_hex());
                 Ok(None)
             }
+            BIGNUM_ADD256_FUNC => {
+                let a_ptr: u32 = args.nth(0);
+                let b_ptr: u32 = args.nth(1);
+                let c_ptr: u32 = args.nth(2);
+
+                let mut a_raw = [0u8; 32];
+                let mut b_raw = [0u8; 32];
+                let mut c_raw = [0u8; 32];
+
+                let memory = self.memory.as_ref().expect("expects memory object");
+                memory
+                    .get_into(a_ptr, &mut a_raw)
+                    .expect("expects reading from memory to succeed");
+                memory
+                    .get_into(b_ptr, &mut b_raw)
+                    .expect("expects reading from memory to succeed");
+
+                let a = U256::from_big_endian(&a_raw);
+                let b = U256::from_big_endian(&b_raw);
+                let c = a.checked_add(b).expect("expects non-overflowing addition");
+                c.to_big_endian(&mut c_raw);
+
+                memory
+                    .set(c_ptr, &c_raw)
+                    .expect("expects writing to memory to succeed");
+
+                Ok(None)
+            }
+            BIGNUM_SUB256_FUNC => {
+                let a_ptr: u32 = args.nth(0);
+                let b_ptr: u32 = args.nth(1);
+                let c_ptr: u32 = args.nth(2);
+
+                let mut a_raw = [0u8; 32];
+                let mut b_raw = [0u8; 32];
+                let mut c_raw = [0u8; 32];
+
+                let memory = self.memory.as_ref().expect("expects memory object");
+                memory
+                    .get_into(a_ptr, &mut a_raw)
+                    .expect("expects reading from memory to succeed");
+                memory
+                    .get_into(b_ptr, &mut b_raw)
+                    .expect("expects reading from memory to succeed");
+
+                let a = U256::from_big_endian(&a_raw);
+                let b = U256::from_big_endian(&b_raw);
+                let c = a
+                    .checked_sub(b)
+                    .expect("expects non-overflowing subtraction");
+                c.to_big_endian(&mut c_raw);
+
+                memory
+                    .set(c_ptr, &c_raw)
+                    .expect("expects writing to memory to succeed");
+
+                Ok(None)
+            }
             _ => panic!("unknown function index"),
         }
     }
@@ -219,6 +280,14 @@ impl<'a> ModuleImportResolver for RuntimeModuleImportResolver {
             "debug_printMemHex" => FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32, ValueType::I32][..], None),
                 DEBUG_PRINTMEMHEX_FUNC,
+            ),
+            "bignum_add256" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32, ValueType::I32, ValueType::I32][..], None),
+                BIGNUM_ADD256_FUNC,
+            ),
+            "bignum_sub256" => FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32, ValueType::I32, ValueType::I32][..], None),
+                BIGNUM_SUB256_FUNC,
             ),
             _ => {
                 return Err(InterpreterError::Function(format!(
