@@ -12,5 +12,5 @@ pub extern "C" fn main() {
     // No updates were made to the state
     let post_state_root = pre_state_root;
 
-    eth2::save_post_state_root(post_state_root)
+    eth2::save_post_state_root(&post_state_root)
 }

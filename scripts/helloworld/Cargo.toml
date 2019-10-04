@@ -8,14 +8,11 @@ description = "Eth 2.0 Phase 2 execution script: Hello World"
 publish = false
 edition = "2018"
 
+[dependencies]
+ewasm_api = { version = "0.10", features = ["std", "eth2", "qimalloc"] }
+
 [lib]
 crate-type = ["cdylib"]
-
-[dependencies.ewasm_api]
-git = "https://github.com/ewasm/ewasm-rust-api"
-rev = "1c01982"
-default-features = false
-features = ["std", "eth2", "qimalloc"]
 
 [profile.release]
 lto = true
