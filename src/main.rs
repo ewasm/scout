@@ -84,6 +84,7 @@ const BIGNUM_SUB256_FUNC: usize = 11;
 type DepositBlob = Vec<u8>;
 
 struct Runtime<'a> {
+    code: &'a [u8],
     ticks_left: u32,
     memory: Option<MemoryRef>,
     pre_state: &'a Bytes32,
@@ -93,14 +94,11 @@ struct Runtime<'a> {
 }
 
 impl<'a> Runtime<'a> {
-    fn new(
-        pre_state: &'a Bytes32,
-        block_data: &'a ShardBlockBody,
-        memory: MemoryRef,
-    ) -> Runtime<'a> {
+    fn new(code: &'a [u8], pre_state: &'a Bytes32, block_data: &'a ShardBlockBody) -> Runtime<'a> {
         Runtime {
+            code: code,
             ticks_left: 10_000_000, // FIXME: make this configurable
-            memory: Some(memory),
+            memory: None,
             pre_state: pre_state,
             block_data: block_data,
             post_state: Bytes32::default(),
@@ -108,13 +106,33 @@ impl<'a> Runtime<'a> {
         }
     }
 
-    fn get_post_state(&self) -> Bytes32 {
-        self.post_state
-    }
+    fn execute(&mut self) -> Result<(Bytes32, Vec<DepositBlob>), ScoutError> {
+        let module = Module::from_buffer(&self.code)?;
+        let mut imports = ImportsBuilder::new();
+        // TODO: remove this and rely on Eth2ImportResolver and DebugImportResolver
+        imports.push_resolver("env", &RuntimeModuleImportResolver);
+        imports.push_resolver("eth2", &Eth2ImportResolver);
+        imports.push_resolver("bignum", &BignumImportResolver);
+        imports.push_resolver("debug", &DebugImportResolver);
 
-    fn get_deposits(&self) -> Vec<DepositBlob> {
+        let instance = ModuleInstance::new(&module, &imports)?.run_start(&mut NopExternals)?;
+
+        // FIXME: pass through errors here and not use .expect()
+        let internal_mem = instance
+            .export_by_name("memory")
+            .expect("Module expected to have 'memory' export")
+            .as_memory()
+            .cloned()
+            .expect("'memory' export should be a memory");
+
+        self.memory = Some(internal_mem);
+
+        let result = instance.invoke_export("main", &[], self)?;
+
+        info!("Result: {:?}", result);
+
         // TODO: avoid cloning here
-        self.deposits.clone()
+        Ok((self.post_state, self.deposits.clone()))
     }
 }
 
@@ -614,32 +632,8 @@ pub fn execute_code(
         block_data
     );
 
-    let module = Module::from_buffer(&code)?;
-    let mut imports = ImportsBuilder::new();
-    // TODO: remove this and rely on Eth2ImportResolver and DebugImportResolver
-    imports.push_resolver("env", &RuntimeModuleImportResolver);
-    imports.push_resolver("eth2", &Eth2ImportResolver);
-    imports.push_resolver("bignum", &BignumImportResolver);
-    imports.push_resolver("debug", &DebugImportResolver);
-
-    let instance = ModuleInstance::new(&module, &imports)?.run_start(&mut NopExternals)?;
-
-    // FIXME: pass through errors here and not use .expect()
-    let internal_mem = instance
-        .export_by_name("memory")
-        .expect("Module expected to have 'memory' export")
-        .as_memory()
-        .cloned()
-        .expect("'memory' export should be a memory");
-
-    let mut runtime = Runtime::new(pre_state, block_data, internal_mem);
-
-    let result = instance.invoke_export("main", &[], &mut runtime)?;
-
-    info!("Result: {:?}", result);
-    info!("Execution finished");
-
-    Ok((runtime.get_post_state(), runtime.get_deposits()))
+    let mut runtime = Runtime::new(&code, pre_state, block_data);
+    runtime.execute()
 }
 
 pub fn process_shard_block(
