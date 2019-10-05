@@ -9,7 +9,6 @@ use rustc_hex::{FromHex, ToHex};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fmt;
-use std::fs::File;
 use wasmi::memory_units::Pages;
 use wasmi::{
     Error as InterpreterError, Externals, FuncInstance, FuncRef, ImportsBuilder, MemoryInstance,
@@ -451,12 +450,7 @@ pub fn process_shard_block(
 }
 
 fn load_file(filename: &str) -> Vec<u8> {
-    use std::io::prelude::*;
-    let mut file = File::open(filename).expect(&format!("loading file {} failed", filename));
-    let mut buf = Vec::new();
-    file.read_to_end(&mut buf)
-        .expect(&format!("reading file {} failed", filename));
-    buf
+    std::fs::read(filename).expect(&format!("loading file {} failed", filename))
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
