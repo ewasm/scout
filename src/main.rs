@@ -630,6 +630,16 @@ pub fn process_shard_block(
         let (post_state, deposits) = execute_code(code, pre_state, &block.data)?;
         state.exec_env_states[env] = post_state;
 
+        // Decode deposits.
+        let deposits: Vec<Deposit> = deposits
+            .into_iter()
+            .map(|deposit| {
+                let mut deposit: &[u8] = &deposit;
+                // FIXME: remove the expect from here
+                Deposit::decode(&mut deposit).expect("valid SSZ decodable deposit")
+            })
+            .collect();
+
         info!("Post-execution deposits: {:?}", deposits)
     }
 
