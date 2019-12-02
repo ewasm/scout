@@ -14,11 +14,10 @@ use ssz::{Decode, Encode};
 use std::env;
 use std::error::Error;
 use std::fmt;
-use wasmi::memory_units::Pages;
 use wasmi::{
-    Error as InterpreterError, Externals, FuncInstance, FuncRef, ImportsBuilder, MemoryInstance,
-    MemoryRef, Module, ModuleImportResolver, ModuleInstance, NopExternals, RuntimeArgs,
-    RuntimeValue, Signature, Trap, TrapKind, ValueType,
+    Error as InterpreterError, Externals, FuncInstance, FuncRef, ImportsBuilder, MemoryRef, Module,
+    ModuleImportResolver, ModuleInstance, NopExternals, RuntimeArgs, RuntimeValue, Signature, Trap,
+    TrapKind, ValueType,
 };
 
 mod types;
@@ -53,16 +52,11 @@ impl<'a> Runtime<'a> {
     fn new(
         pre_state: &'a Bytes32,
         block_data: &'a ShardBlockBody,
-        memory: Option<MemoryRef>,
+        memory: MemoryRef,
     ) -> Runtime<'a> {
         Runtime {
             ticks_left: 10_000_000, // FIXME: make this configurable
-            memory: if memory.is_some() {
-                memory
-            } else {
-                // Allocate a single page if no memory was exported.
-                Some(MemoryInstance::alloc(Pages(1), Some(Pages(1))).unwrap())
-            },
+            memory: Some(memory),
             pre_state: pre_state,
             block_data: block_data,
             post_state: Bytes32::default(),
@@ -594,7 +588,7 @@ pub fn execute_code(
         .cloned()
         .expect("'memory' export should be a memory");
 
-    let mut runtime = Runtime::new(pre_state, block_data, Some(internal_mem));
+    let mut runtime = Runtime::new(pre_state, block_data, internal_mem);
 
     let result = instance.invoke_export("main", &[], &mut runtime)?;
 
