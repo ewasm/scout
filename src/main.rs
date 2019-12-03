@@ -108,25 +108,31 @@ struct Runtime<'a> {
 }
 
 impl<'a> Runtime<'a> {
-    fn new(
-        code: &'a [u8],
-        libraries: &'a Vec<Library>,
-        pre_state: &'a Bytes32,
-        block_data: &'a ShardBlockBody,
-    ) -> Runtime<'a> {
+    fn new(code: &'a [u8], libraries: &'a Vec<Library>) -> Runtime<'a> {
         Runtime {
             code: code,
             libraries: libraries,
             ticks_left: 10_000_000, // FIXME: make this configurable
             memory: None,
-            pre_state: pre_state,
-            block_data: block_data,
+            pre_state: &Bytes32::default(),
+            block_data: &ShardBlockBody::default(),
             post_state: Bytes32::default(),
             deposits: vec![],
         }
     }
 
-    fn execute(&mut self) -> Result<(Bytes32, Vec<DepositBlob>), ScoutError> {
+    fn execute(
+        &mut self,
+        pre_state: &'a Bytes32,
+        block_data: &'a ShardBlockBody,
+    ) -> Result<(Bytes32, Vec<DepositBlob>), ScoutError> {
+        // FIXME: this a reset basically
+        self.ticks_left = 10_000_000;
+        self.pre_state = pre_state;
+        self.block_data = block_data;
+        self.post_state = Bytes32::default();
+        self.deposits = vec![];
+
         let module = Module::from_buffer(&self.code)?;
         let mut imports = ImportsBuilder::new();
         // TODO: remove this and rely on Eth2ImportResolver and DebugImportResolver
@@ -669,8 +675,8 @@ pub fn execute_code(
         block_data
     );
 
-    let mut runtime = Runtime::new(&code, &libraries, pre_state, block_data);
-    runtime.execute()
+    let mut runtime = Runtime::new(&code, &libraries);
+    runtime.execute(pre_state, block_data)
 }
 
 pub fn process_shard_block(
