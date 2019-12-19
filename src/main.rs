@@ -477,7 +477,7 @@ impl<'a> ModuleImportResolver for DebugImportResolver {
 const BYTES_PER_SHARD_BLOCK_BODY: usize = 16384;
 const ZERO_HASH: Bytes32 = Bytes32 { bytes: [0u8; 32] };
 
-#[derive(Default, PartialEq, Clone, Debug, Ssz)]
+#[derive(Default, PartialEq, Clone, Debug, Encode, Decode)]
 pub struct Hash([u8; 32]);
 
 #[derive(Clone, Ssz)]
@@ -501,7 +501,7 @@ impl fmt::Debug for BLSPubKey {
     }
 }
 
-#[derive(Clone, Ssz)]
+#[derive(Clone, Encode, Decode)]
 pub struct BLSSignature([u8; 96]);
 
 impl PartialEq for BLSSignature {
@@ -525,7 +525,7 @@ impl fmt::Debug for BLSSignature {
 /// These are Phase 0 structures.
 /// https://github.com/ethereum/eth2.0-specs/blob/dev/specs/core/0_beacon-chain.md
 /// basically this is a little-endian tightly packed representation of those fields.
-#[derive(Default, PartialEq, Clone, Debug, Ssz)]
+#[derive(Default, PartialEq, Clone, Debug, Encode, Decode)]
 pub struct Deposit {
     pubkey: BLSPubKey,
     withdrawal_credentials: Hash,
