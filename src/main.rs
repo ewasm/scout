@@ -602,14 +602,14 @@ pub fn process_shard_block(
     state: &mut ShardState,
     beacon_state: &BeaconState,
     block: Option<ShardBlock>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<Vec<Deposit>, Box<dyn Error>> {
     // println!("Beacon state: {:#?}", beacon_state);
 
     info!("Pre-execution: {}", state);
 
     // TODO: implement state root handling
 
-    if let Some(block) = block {
+    let deposit_receipts = if let Some(block) = block {
         info!("Executing block: {}", block);
 
         // The execution environment identifier
@@ -625,23 +625,24 @@ pub fn process_shard_block(
         state.exec_env_states[env] = post_state;
 
         // Decode deposits.
-        let deposits: Vec<Deposit> = deposits
+        deposits
             .into_iter()
             .map(|deposit| {
                 let mut deposit: &[u8] = &deposit;
                 // FIXME: remove the expect from here
                 Deposit::decode(&mut deposit).expect("valid SSZ decodable deposit")
             })
-            .collect();
-
-        info!("Post-execution deposits: {:?}", deposits)
-    }
+            .collect()
+    } else {
+        Vec::new()
+    };
 
     // TODO: implement state + deposit root handling
 
+    info!("Post-execution deposit receipts: {:?}", deposit_receipts);
     info!("Post-execution: {}", state);
 
-    Ok(())
+    Ok(deposit_receipts)
 }
 
 fn load_file(filename: &str) -> Vec<u8> {
@@ -665,11 +666,20 @@ struct TestShardState {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct TestDeposit {
+    pubkey: String,
+    withdrawal_credentials: String,
+    amount: u64,
+    signature: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct TestFile {
     beacon_state: TestBeaconState,
     shard_blocks: Vec<TestShardBlock>,
     shard_pre_state: TestShardState,
     shard_post_state: TestShardState,
+    deposit_receipts: Vec<TestDeposit>,
 }
 
 impl From<TestBeaconState> for BeaconState {
@@ -715,6 +725,28 @@ impl From<TestShardState> for ShardState {
     }
 }
 
+impl From<TestDeposit> for Deposit {
+    fn from(input: TestDeposit) -> Self {
+        let mut raw_pubkey = [0; 48];
+        raw_pubkey.copy_from_slice(&input.pubkey.from_hex().expect("invalid hex data")[..]);
+        let mut raw_withdrawal_credentials = [0; 32];
+        raw_withdrawal_credentials.copy_from_slice(
+            &input
+                .withdrawal_credentials
+                .from_hex()
+                .expect("invalid hex data")[..],
+        );
+        let mut raw_signature: [u8; 96] = [0; 96];
+        raw_signature.copy_from_slice(&input.signature.from_hex().expect("invalid hex data")[..]);
+        Deposit {
+            pubkey: BLSPubKey(raw_pubkey),
+            withdrawal_credentials: Hash(raw_withdrawal_credentials),
+            amount: input.amount,
+            signature: BLSSignature(raw_signature),
+        }
+    }
+}
+
 fn process_yaml_test(filename: &str) {
     info!("Processing {}...", filename);
     let content = load_file(&filename);
@@ -725,12 +757,33 @@ fn process_yaml_test(filename: &str) {
     let beacon_state: BeaconState = test_file.beacon_state.into();
     let pre_state: ShardState = test_file.shard_pre_state.into();
     let post_state: ShardState = test_file.shard_post_state.into();
+    let expected_deposit_receipts: Vec<Deposit> = test_file
+        .deposit_receipts
+        .into_iter()
+        .map(|deposit| deposit.into())
+        .collect();
 
     let mut shard_state = pre_state;
+    let mut deposit_receipts = Vec::new();
     for block in test_file.shard_blocks {
-        process_shard_block(&mut shard_state, &beacon_state, Some(block.into()))
-            .expect("processing shard block to succeed")
+        deposit_receipts.append(
+            process_shard_block(&mut shard_state, &beacon_state, Some(block.into()))
+                .expect("processing shard block to succeed")
+                .as_mut(),
+        );
     }
+
+    if expected_deposit_receipts
+        .iter()
+        .all(|deposit| deposit_receipts.contains(deposit))
+    {
+        println!("Matching deposit receipts.")
+    } else {
+        println!("Expected deposit receipts: {:?}", expected_deposit_receipts);
+        println!("Got deposit receipts: {:?}", deposit_receipts);
+        std::process::exit(1);
+    }
+
     debug!("{}", shard_state);
     if shard_state != post_state {
         println!("Expected state: {}", post_state);
