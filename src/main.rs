@@ -43,6 +43,14 @@ impl From<rustc_hex::FromHexError> for ScoutError {
     }
 }
 
+impl From<serde_yaml::Error> for ScoutError {
+    fn from(error: serde_yaml::Error) -> Self {
+        ScoutError {
+            0: error.description().to_string(),
+        }
+    }
+}
+
 impl From<wasmi::Error> for ScoutError {
     fn from(error: wasmi::Error) -> Self {
         ScoutError {
@@ -818,42 +826,27 @@ impl TryFrom<TestDeposit> for Deposit {
     }
 }
 
-fn process_yaml_test(filename: &str) {
+fn process_yaml_test(filename: &str) -> Result<(), ScoutError> {
     info!("Processing {}...", filename);
-    let content = std::fs::read(&filename).expect("to load file");
-    let test_file: TestFile =
-        serde_yaml::from_slice::<TestFile>(&content[..]).expect("expected valid yaml");
+    let content = std::fs::read(&filename)?;
+    let test_file: TestFile = serde_yaml::from_slice::<TestFile>(&content[..])?;
     debug!("{:#?}", test_file);
 
-    let beacon_state: BeaconState = test_file
-        .beacon_state
-        .try_into()
-        .expect("valid beacon_state definition");
-    let pre_state: ShardState = test_file
-        .shard_pre_state
-        .try_into()
-        .expect("valid pre_state befinition");
-    let post_state: ShardState = test_file
-        .shard_post_state
-        .try_into()
-        .expect("valid post_state definition");
-    let expected_deposit_receipts: Vec<Deposit> = test_file
+    let beacon_state: BeaconState = test_file.beacon_state.try_into()?;
+    let pre_state: ShardState = test_file.shard_pre_state.try_into()?;
+    let post_state: ShardState = test_file.shard_post_state.try_into()?;
+    let expected_deposit_receipts: Result<Vec<Deposit>, ScoutError> = test_file
         .deposit_receipts
         .into_iter()
-        .map(|deposit| deposit.try_into().expect("valid deposit"))
+        .map(|deposit| deposit.try_into())
         .collect();
+    let expected_deposit_receipts = expected_deposit_receipts?;
 
     let mut shard_state = pre_state;
     let mut deposit_receipts = Vec::new();
     for block in test_file.shard_blocks {
         deposit_receipts.append(
-            process_shard_block(
-                &mut shard_state,
-                &beacon_state,
-                Some(block.try_into().expect("valid block")),
-            )
-            .expect("processing shard block to succeed")
-            .as_mut(),
+            process_shard_block(&mut shard_state, &beacon_state, Some(block.try_into()?))?.as_mut(),
         );
     }
 
@@ -865,26 +858,33 @@ fn process_yaml_test(filename: &str) {
     } else {
         println!("Expected deposit receipts: {:?}", expected_deposit_receipts);
         println!("Got deposit receipts: {:?}", deposit_receipts);
-        std::process::exit(1);
+        // TODO: make this an error?
+        return Ok(());
     }
 
     debug!("{}", shard_state);
     if shard_state != post_state {
         println!("Expected state: {}", post_state);
         println!("Got state: {}", shard_state);
-        std::process::exit(1);
+        // TODO: make this an error?
+        return Ok(());
     } else {
         println!("Matching state.");
     }
+
+    Ok(())
 }
 
 fn main() {
     env_logger::init();
 
     let args: Vec<String> = env::args().collect();
-    process_yaml_test(if args.len() != 2 {
+    let ret = process_yaml_test(if args.len() != 2 {
         "test.yaml"
     } else {
         &args[1]
     });
+    if ret.is_err() {
+        println!("Unexpected test failure: {:?}", ret.err().unwrap())
+    }
 }
