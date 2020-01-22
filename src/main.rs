@@ -705,43 +705,41 @@ struct TestFile {
     deposit_receipts: Vec<TestDeposit>,
 }
 
+fn hex_to_slice(input: &str, output: &mut [u8]) {
+    let tmp = input.from_hex().expect("invalid hex data");
+    assert!(tmp.len() == output.len());
+    output.copy_from_slice(&tmp[..]);
+}
+
 impl From<&String> for Bytes32 {
     fn from(input: &String) -> Self {
-        let input = input.from_hex().expect("invalid hex data");
-        assert!(input.len() == 32);
         let mut ret = Bytes32::default();
-        ret.bytes.copy_from_slice(&input[..]);
+        hex_to_slice(input, &mut ret.bytes);
         ret
     }
 }
 
 impl From<String> for Hash {
     fn from(input: String) -> Self {
-        let input = input.from_hex().expect("invalid hex data");
-        assert!(input.len() == 32);
-        let mut ret = [0; 32];
-        ret.copy_from_slice(&input[..]);
-        Hash(ret)
+        let mut ret = Hash::default();
+        hex_to_slice(&input, &mut ret.0);
+        ret
     }
 }
 
 impl From<String> for BLSPubKey {
     fn from(input: String) -> Self {
-        let input = input.from_hex().expect("invalid hex data");
-        assert!(input.len() == 48);
-        let mut ret = [0; 48];
-        ret.copy_from_slice(&input[..]);
-        BLSPubKey(ret)
+        let mut ret = BLSPubKey::default();
+        hex_to_slice(&input, &mut ret.0);
+        ret
     }
 }
 
 impl From<String> for BLSSignature {
     fn from(input: String) -> Self {
-        let input = input.from_hex().expect("invalid hex data");
-        assert!(input.len() == 96);
-        let mut ret = [0; 96];
-        ret.copy_from_slice(&input[..]);
-        BLSSignature(ret)
+        let mut ret = BLSSignature::default();
+        hex_to_slice(&input, &mut ret.0);
+        ret
     }
 }
 
