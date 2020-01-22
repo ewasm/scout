@@ -26,8 +26,16 @@ use crate::types::*;
 #[derive(Debug)]
 pub struct ScoutError(String);
 
+impl From<std::io::Error> for ScoutError {
+    fn from(error: std::io::Error) -> Self {
+        ScoutError {
+            0: error.description().to_string(),
+        }
+    }
+}
+
 impl From<wasmi::Error> for ScoutError {
-    fn from(error: InterpreterError) -> Self {
+    fn from(error: wasmi::Error) -> Self {
         ScoutError {
             0: error.description().to_string(),
         }
@@ -664,10 +672,6 @@ pub fn process_shard_block(
     Ok(deposit_receipts)
 }
 
-fn load_file(filename: &str) -> Vec<u8> {
-    std::fs::read(filename).expect(&format!("loading file {} failed", filename))
-}
-
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct TestBeaconState {
     execution_scripts: Vec<String>,
@@ -707,7 +711,9 @@ impl From<TestBeaconState> for BeaconState {
             execution_scripts: input
                 .execution_scripts
                 .iter()
-                .map(|x| ExecutionScript { code: load_file(x) })
+                .map(|filename| ExecutionScript {
+                    code: std::fs::read(filename).expect("to load file"),
+                })
                 .collect(),
         }
     }
@@ -768,7 +774,7 @@ impl From<TestDeposit> for Deposit {
 
 fn process_yaml_test(filename: &str) {
     info!("Processing {}...", filename);
-    let content = load_file(&filename);
+    let content = std::fs::read(&filename).expect("to load file");
     let test_file: TestFile =
         serde_yaml::from_slice::<TestFile>(&content[..]).expect("expected valid yaml");
     debug!("{:#?}", test_file);
