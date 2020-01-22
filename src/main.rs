@@ -705,6 +705,44 @@ struct TestFile {
     deposit_receipts: Vec<TestDeposit>,
 }
 
+fn hex_to_slice(input: &str, output: &mut [u8]) {
+    let tmp = input.from_hex().expect("invalid hex data");
+    assert!(tmp.len() == output.len());
+    output.copy_from_slice(&tmp[..]);
+}
+
+impl From<&String> for Bytes32 {
+    fn from(input: &String) -> Self {
+        let mut ret = Bytes32::default();
+        hex_to_slice(input, &mut ret.bytes);
+        ret
+    }
+}
+
+impl From<String> for Hash {
+    fn from(input: String) -> Self {
+        let mut ret = Hash::default();
+        hex_to_slice(&input, &mut ret.0);
+        ret
+    }
+}
+
+impl From<String> for BLSPubKey {
+    fn from(input: String) -> Self {
+        let mut ret = BLSPubKey::default();
+        hex_to_slice(&input, &mut ret.0);
+        ret
+    }
+}
+
+impl From<String> for BLSSignature {
+    fn from(input: String) -> Self {
+        let mut ret = BLSSignature::default();
+        hex_to_slice(&input, &mut ret.0);
+        ret
+    }
+}
+
 impl From<TestBeaconState> for BeaconState {
     fn from(input: TestBeaconState) -> Self {
         BeaconState {
@@ -736,13 +774,7 @@ impl From<TestShardState> for ShardState {
             exec_env_states: input
                 .exec_env_states
                 .iter()
-                .map(|x| {
-                    let state = x.from_hex().expect("invalid hex data");
-                    assert!(state.len() == 32);
-                    let mut ret = Bytes32::default();
-                    ret.bytes.copy_from_slice(&state[..]);
-                    ret
-                })
+                .map(|state| state.into())
                 .collect(),
             slot: 0,
             parent_block: ShardBlockHeader {},
@@ -752,22 +784,11 @@ impl From<TestShardState> for ShardState {
 
 impl From<TestDeposit> for Deposit {
     fn from(input: TestDeposit) -> Self {
-        let mut raw_pubkey = [0; 48];
-        raw_pubkey.copy_from_slice(&input.pubkey.from_hex().expect("invalid hex data")[..]);
-        let mut raw_withdrawal_credentials = [0; 32];
-        raw_withdrawal_credentials.copy_from_slice(
-            &input
-                .withdrawal_credentials
-                .from_hex()
-                .expect("invalid hex data")[..],
-        );
-        let mut raw_signature: [u8; 96] = [0; 96];
-        raw_signature.copy_from_slice(&input.signature.from_hex().expect("invalid hex data")[..]);
         Deposit {
-            pubkey: BLSPubKey(raw_pubkey),
-            withdrawal_credentials: Hash(raw_withdrawal_credentials),
+            pubkey: input.pubkey.into(),
+            withdrawal_credentials: input.withdrawal_credentials.into(),
             amount: input.amount,
-            signature: BLSSignature(raw_signature),
+            signature: input.signature.into(),
         }
     }
 }
