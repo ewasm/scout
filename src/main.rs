@@ -722,8 +722,15 @@ pub fn process_shard_block(
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct TestLibrary {
+    name: String,
+    file: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct TestBeaconState {
     execution_scripts: Vec<String>,
+    libraries: Vec<TestLibrary>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -811,10 +818,19 @@ impl TryFrom<TestBeaconState> for BeaconState {
                 })
             })
             .collect();
+        let libraries: Result<Vec<Library>, ScoutError> = input
+            .libraries
+            .iter()
+            .map(|library| {
+                Ok(Library {
+                    name: library.name.to_string(),
+                    code: std::fs::read(&library.file)?,
+                })
+            })
+            .collect();
         Ok(BeaconState {
             execution_scripts: scripts?,
-            // FIXME: add parser here
-            libraries: Vec::new(),
+            libraries: libraries?,
         })
     }
 }
