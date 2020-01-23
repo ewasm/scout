@@ -87,16 +87,18 @@ fn load_import(code: &[u8]) -> Result<wasmi::ModuleRef, ScoutError> {
     Ok(instance)
 }
 
-// FIXME: make this nicer
-// Tuple of name -> code
-type Libraries<'a> = [(&'a str, &'a [u8])];
+#[derive(Default, PartialEq, Clone, Debug)]
+pub struct Library {
+    name: String,
+    code: Vec<u8>,
+}
 
 // TODO: move elsehwere?
 type DepositBlob = Vec<u8>;
 
 struct Runtime<'a> {
     code: &'a [u8],
-    libraries: &'a Libraries<'a>,
+    libraries: &'a Vec<Library>,
     ticks_left: u32,
     memory: Option<MemoryRef>,
     pre_state: &'a Bytes32,
@@ -108,7 +110,7 @@ struct Runtime<'a> {
 impl<'a> Runtime<'a> {
     fn new(
         code: &'a [u8],
-        libraries: &'a Libraries,
+        libraries: &'a Vec<Library>,
         pre_state: &'a Bytes32,
         block_data: &'a ShardBlockBody,
     ) -> Runtime<'a> {
@@ -138,7 +140,7 @@ impl<'a> Runtime<'a> {
         let libraries: Result<Vec<(String, wasmi::ModuleRef)>, ScoutError> = self
             .libraries
             .iter()
-            .map(|(ref name, ref code)| Ok((name.to_string(), load_import(code)?)))
+            .map(|ref library| Ok((library.name.to_string(), load_import(&library.code)?)))
             .collect();
         let libraries = libraries?;
 
@@ -594,6 +596,7 @@ pub struct ExecutionScript {
 #[derive(Default, PartialEq, Clone, Debug)]
 pub struct BeaconState {
     execution_scripts: Vec<ExecutionScript>,
+    libraries: Vec<Library>,
 }
 
 /// Shards are Phase 1 structures.
@@ -656,7 +659,7 @@ impl fmt::Display for ShardState {
 
 pub fn execute_code(
     code: &[u8],
-    libraries: &Libraries,
+    libraries: &Vec<Library>,
     pre_state: &Bytes32,
     block_data: &ShardBlockBody,
 ) -> Result<(Bytes32, Vec<DepositBlob>), ScoutError> {
@@ -693,7 +696,8 @@ pub fn process_shard_block(
         //     state.exec_env_states.push(ZERO_HASH)
         // }
         let pre_state = &state.exec_env_states[env];
-        let (post_state, deposits) = execute_code(code, &Vec::new(), pre_state, &block.data)?;
+        let (post_state, deposits) =
+            execute_code(code, &beacon_state.libraries, pre_state, &block.data)?;
         state.exec_env_states[env] = post_state;
 
         // Decode deposits.
@@ -809,6 +813,8 @@ impl TryFrom<TestBeaconState> for BeaconState {
             .collect();
         Ok(BeaconState {
             execution_scripts: scripts?,
+            // FIXME: add parser here
+            libraries: Vec::new(),
         })
     }
 }
