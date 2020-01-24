@@ -730,7 +730,7 @@ struct TestLibrary {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct TestBeaconState {
     execution_scripts: Vec<String>,
-    libraries: Vec<TestLibrary>,
+    libraries: Option<Vec<TestLibrary>>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -818,16 +818,19 @@ impl TryFrom<TestBeaconState> for BeaconState {
                 })
             })
             .collect();
-        let libraries: Result<Vec<Library>, ScoutError> = input
-            .libraries
-            .iter()
-            .map(|library| {
-                Ok(Library {
-                    name: library.name.to_string(),
-                    code: std::fs::read(&library.file)?,
+        let libraries: Result<Vec<Library>, ScoutError> = if let Some(libraries) = input.libraries {
+            libraries
+                .iter()
+                .map(|library| {
+                    Ok(Library {
+                        name: library.name.to_string(),
+                        code: std::fs::read(&library.file)?,
+                    })
                 })
-            })
-            .collect();
+                .collect()
+        } else {
+            Ok(Vec::new())
+        };
         Ok(BeaconState {
             execution_scripts: scripts?,
             libraries: libraries?,
