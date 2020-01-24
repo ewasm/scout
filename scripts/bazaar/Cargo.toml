@@ -20,3 +20,4 @@ crate-type = ["cdylib"]
 [profile.release]
 lto = true
 debug = false
+opt-level = 3
