@@ -3,14 +3,10 @@ extern crate wasmi;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
-extern crate ssz;
-#[macro_use]
-extern crate ssz_derive;
 
 use primitive_types::U256;
 use rustc_hex::{FromHex, ToHex};
 use serde::{Deserialize, Serialize};
-use ssz::{Decode, Encode};
 use std::convert::{TryFrom, TryInto};
 use std::env;
 use std::error::Error;
@@ -536,10 +532,10 @@ impl<'a> ModuleImportResolver for DebugImportResolver {
 const BYTES_PER_SHARD_BLOCK_BODY: usize = 16384;
 const ZERO_HASH: Bytes32 = Bytes32 { bytes: [0u8; 32] };
 
-#[derive(Default, PartialEq, Clone, Debug, Ssz)]
+#[derive(Default, PartialEq, Clone, Debug)]
 pub struct Hash([u8; 32]);
 
-#[derive(Clone, Ssz)]
+#[derive(Clone)]
 pub struct BLSPubKey([u8; 48]);
 
 impl PartialEq for BLSPubKey {
@@ -560,7 +556,7 @@ impl fmt::Debug for BLSPubKey {
     }
 }
 
-#[derive(Clone, Ssz)]
+#[derive(Clone)]
 pub struct BLSSignature([u8; 96]);
 
 impl PartialEq for BLSSignature {
@@ -584,7 +580,7 @@ impl fmt::Debug for BLSSignature {
 /// These are Phase 0 structures.
 /// https://github.com/ethereum/eth2.0-specs/blob/dev/specs/core/0_beacon-chain.md
 /// basically this is a little-endian tightly packed representation of those fields.
-#[derive(Default, PartialEq, Clone, Debug, Ssz)]
+#[derive(Default, PartialEq, Clone, Debug)]
 pub struct Deposit {
     pubkey: BLSPubKey,
     withdrawal_credentials: Hash,
