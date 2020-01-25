@@ -27,6 +27,12 @@ use crate::types::*;
 #[derive(Debug)]
 pub struct ScoutError(String);
 
+impl From<String> for ScoutError {
+    fn from(error: String) -> Self {
+        ScoutError { 0: error }
+    }
+}
+
 impl From<std::io::Error> for ScoutError {
     fn from(error: std::io::Error) -> Self {
         ScoutError {
@@ -586,6 +592,29 @@ pub struct Deposit {
     signature: BLSSignature,
 }
 
+impl TryFrom<Vec<u8>> for Deposit {
+    type Error = String;
+    fn try_from(input: Vec<u8>) -> Result<Self, Self::Error> {
+        if input.len() != 184 {
+            return Err("input be must exactly 184 bytes long".to_string());
+        }
+        let mut raw_pubkey = [0u8; 48];
+        raw_pubkey.copy_from_slice(&input[0..48]);
+        let mut raw_hash = [0u8; 32];
+        raw_hash.copy_from_slice(&input[48..80]);
+        let mut raw_amount = [0u8; 8];
+        raw_amount.copy_from_slice(&input[80..88]);
+        let mut raw_signature = [0u8; 96];
+        raw_signature.copy_from_slice(&input[88..184]);
+        Ok(Deposit {
+            pubkey: BLSPubKey(raw_pubkey),
+            withdrawal_credentials: Hash(raw_hash),
+            amount: u64::from_be_bytes(raw_amount),
+            signature: BLSSignature(raw_signature),
+        })
+    }
+}
+
 /// These are Phase 2 Proposal 2 structures.
 
 #[derive(Default, PartialEq, Clone, Debug)]
@@ -701,14 +730,11 @@ pub fn process_shard_block(
         state.exec_env_states[env] = post_state;
 
         // Decode deposits.
-        deposits
+        let deposits: Result<Vec<Deposit>, _> = deposits
             .into_iter()
-            .map(|deposit| {
-                let mut deposit: &[u8] = &deposit;
-                // FIXME: remove the expect from here
-                Deposit::decode(&mut deposit).expect("valid SSZ decodable deposit")
-            })
-            .collect()
+            .map(|deposit| deposit.try_into())
+            .collect();
+        deposits?
     } else {
         Vec::new()
     };
