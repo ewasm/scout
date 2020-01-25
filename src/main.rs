@@ -98,7 +98,7 @@ type DepositBlob = Vec<u8>;
 
 struct Runtime<'a> {
     code: &'a [u8],
-    libraries: &'a Vec<Library>,
+    libraries: &'a [Library],
     ticks_left: u32,
     memory: Option<MemoryRef>,
     pre_state: &'a Bytes32,
@@ -110,7 +110,7 @@ struct Runtime<'a> {
 impl<'a> Runtime<'a> {
     fn new(
         code: &'a [u8],
-        libraries: &'a Vec<Library>,
+        libraries: &'a [Library],
         pre_state: &'a Bytes32,
         block_data: &'a ShardBlockBody,
     ) -> Runtime<'a> {
@@ -122,7 +122,7 @@ impl<'a> Runtime<'a> {
             pre_state: pre_state,
             block_data: block_data,
             post_state: Bytes32::default(),
-            deposits: vec![],
+            deposits: Vec::new(),
         }
     }
 
@@ -659,7 +659,7 @@ impl fmt::Display for ShardState {
 
 pub fn execute_code(
     code: &[u8],
-    libraries: &Vec<Library>,
+    libraries: &[Library],
     pre_state: &Bytes32,
     block_data: &ShardBlockBody,
 ) -> Result<(Bytes32, Vec<DepositBlob>), ScoutError> {
