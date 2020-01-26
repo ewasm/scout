@@ -1,0 +1,34 @@
+[package]
+name = "phase2-bazaar-partials"
+version = "0.0.0"
+authors = ["Alex Beregszaszi <alex@rtfs.hu>", "Matt Garnett <14004106+c-o-l-o-r@users.noreply.github.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/ewasm/scout"
+description = "Eth 2.0 Phase 2 execution script using partials: Bazaar message board"
+publish = false
+edition = "2018"
+
+[dependencies]
+sha3 = "^0.6"
+merkle_partial = { git = "https://github.com/c-o-l-o-r/lighthouse", branch="ssz-merkle-partial" }
+merkle_partial_derive = { git = "https://github.com/c-o-l-o-r/lighthouse", branch="ssz-merkle-partial" }
+eth2_ssz = { git = "https://github.com/c-o-l-o-r/lighthouse", branch="ssz-merkle-partial" }
+eth2_ssz_derive  = { git = "https://github.com/c-o-l-o-r/lighthouse", branch="ssz-merkle-partial" }
+ssz_types = { git = "https://github.com/c-o-l-o-r/lighthouse", branch="ssz-merkle-partial" }
+typenum = "1.10.0"
+
+[dependencies.ewasm_api]
+git = "https://github.com/ewasm/ewasm-rust-api"
+rev = "1c01982"
+default-features = false
+features = ["std", "eth2", "qimalloc"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+lto = true
+debug = false
+
+[dev-dependencies]
+hex = "0.3.2"
