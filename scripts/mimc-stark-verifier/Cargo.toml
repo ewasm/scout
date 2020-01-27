@@ -1,0 +1,30 @@
+[package]
+name = "phase2-stark-verifier"
+version = "0.0.0"
+authors = ["Jared Wasinger"]
+license = "Apache-2.0"
+repository = "https://github.com/ewasm/scout"
+description = "Eth 2.0 Phase 2 execution script: MIMC STARK verifier"
+publish = false
+edition = "2018"
+
+[dependencies]
+ssz = "0.1.2"
+ssz-derive = "0.1.2"
+sha3 = "^0.6"
+stark_verifier = { git = "https://github.com/jwasinger/stark-verifier", branch = "feat/lib" }
+num-bigint = { git = "https://github.com/jwasinger/num-bigint", branch = "feature/pow"}
+num-traits = "0.2.8"
+
+[dependencies.ewasm_api]
+git = "https://github.com/ewasm/ewasm-rust-api"
+rev = "1c01982"
+default-features = false
+features = ["std", "eth2", "qimalloc"]
+
+# [profile.release]
+# lto = true
+# debug = false
+
+[lib]
+crate-type = ["cdylib"]
