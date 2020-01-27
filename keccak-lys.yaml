@@ -1,0 +1,13 @@
+beacon_state:
+  execution_scripts:
+    - scripts/keccak-lys/build/main.wasm
+shard_pre_state:
+  exec_env_states:
+    - "0000000000000000000000000000000000000000000000000000000000000000"
+shard_blocks:
+  - env: 0
+    data: "00000000000000000000000000000000000000000000000000000000000000ff"
+shard_post_state:
+  exec_env_states:
+    - "9f1c3493f670fb5a4611e82d5bbb06eb4969a406ecc1e47c0dca6f5ce354d187"
+deposit_receipts: []

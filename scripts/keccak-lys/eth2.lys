@@ -1,0 +1,11 @@
+#[extern "env" "loadPreStateRoot"]
+fun loadPreStateRoot(ptr: u32): void = panic()
+
+#[extern "env" "eth2_blockDataSize"]
+fun blockDataSize(): u32 = panic()
+
+#[extern "env" "eth2_blockDataCopy"]
+fun blockDataCopy(ptr: u32, offset: u32, len: u32): void = panic()
+
+#[extern "env" "eth2_savePostStateRoot"]
+fun savePostStateRoot(ptr: u32): void = panic()
