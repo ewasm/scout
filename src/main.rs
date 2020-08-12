@@ -1,11 +1,10 @@
-extern crate rustc_hex;
+extern crate hex;
 extern crate wasmi;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
 
 use primitive_types::U256;
-use rustc_hex::{FromHex, ToHex};
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 use std::env;
@@ -37,8 +36,8 @@ impl From<std::io::Error> for ScoutError {
     }
 }
 
-impl From<rustc_hex::FromHexError> for ScoutError {
-    fn from(error: rustc_hex::FromHexError) -> Self {
+impl From<hex::FromHexError> for ScoutError {
+    fn from(error: hex::FromHexError) -> Self {
         ScoutError {
             0: error.description().to_string(),
         }
@@ -248,7 +247,7 @@ impl<'a> Externals for Runtime<'a> {
                 let tmp = memory
                     .get(ptr, length as usize)
                     .expect("expects reading from memory to succeed");
-                debug!("deposit: {}", tmp.to_hex());
+                debug!("deposit: {}", hex::encode(tmp.clone()));
                 self.deposits.push(tmp);
 
                 Ok(None)
@@ -286,7 +285,7 @@ impl<'a> Externals for Runtime<'a> {
                 memory
                     .get_into(ptr, &mut buf)
                     .expect("expects reading from memory to succeed");
-                debug!("print.hex: {}", buf.to_hex());
+                debug!("print.hex: {}", hex::encode(buf).clone());
                 Ok(None)
             }
             BIGNUM_ADD256_FUNC => {
@@ -552,7 +551,8 @@ impl Default for BLSPubKey {
 
 impl fmt::Debug for BLSPubKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.to_hex())
+        unimplemented!()
+        // write!(f, "{}", hex::encode(self.0))
     }
 }
 
@@ -573,7 +573,8 @@ impl Default for BLSSignature {
 
 impl fmt::Debug for BLSSignature {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.to_hex())
+        unimplemented!()
+        // write!(f, "{}", hex::encode(self.0))
     }
 }
 
@@ -653,7 +654,7 @@ pub struct ShardState {
 
 impl fmt::Display for ShardBlockBody {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.data.to_hex())
+        write!(f, "{}", hex::encode(self.data.clone()))
     }
 }
 
@@ -672,7 +673,7 @@ impl fmt::Display for ShardState {
         let states: Vec<String> = self
             .exec_env_states
             .iter()
-            .map(|x| x.bytes.to_hex())
+            .map(|state| hex::encode(state.bytes))
             .collect();
         write!(
             f,
@@ -784,7 +785,7 @@ struct TestFile {
 }
 
 fn hex_to_slice(input: &str, output: &mut [u8]) -> Result<(), ScoutError> {
-    let tmp = input.from_hex()?;
+    let tmp = hex::decode(input)?;
     if tmp.len() != output.len() {
         return Err(ScoutError("Length mismatch from hex input".to_string()));
     }
@@ -866,7 +867,7 @@ impl TryFrom<TestShardBlock> for ShardBlock {
         Ok(ShardBlock {
             env: input.env,
             data: ShardBlockBody {
-                data: input.data.from_hex()?,
+                data: hex::decode(input.data)?,
             },
         })
     }
